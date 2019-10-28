@@ -12,6 +12,7 @@ RUN set -ex \
     && apk upgrade -q \
     && apk add -q \
         build-base \
+        git \
         less \
         nano \
     && pip install earthengine-api
