@@ -15,5 +15,3 @@ RUN set -ex \
         less \
         nano \
     && pip install earthengine-api
-WORKDIR /app
-COPY $PWD/src .
