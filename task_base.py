@@ -153,15 +153,16 @@ class EETask(Task):
         super().run()
 
     def get_unfinished_ee_tasks(self):
-        # possible ee task states: READY, RUNNING, COMPLETED, FAILED, CANCELLED, UNKNOWN
-        statuses = ee.data.getTaskStatus(self.ee_taskids)
-        print(statuses)
         unfinished_tasks = []
-        for s in statuses:
-            if s['state'] in ['READY', 'RUNNING']:
-                unfinished_tasks.append(s['id'])
-            elif s['state'] == 'UNKOWN':
-                raise ValueError('unknown task {}'.format(s['id']))
+        if self.ee_taskids:
+            # possible ee task states: READY, RUNNING, COMPLETED, FAILED, CANCELLED, UNKNOWN
+            statuses = ee.data.getTaskStatus(self.ee_taskids)
+            print(statuses)
+            for s in statuses:
+                if s['state'] in ['READY', 'RUNNING']:
+                    unfinished_tasks.append(s['id'])
+                elif s['state'] == 'UNKOWN':
+                    raise ValueError('unknown task {}'.format(s['id']))
 
         return unfinished_tasks
 
