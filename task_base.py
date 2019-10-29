@@ -173,6 +173,12 @@ class SCLTask(EETask):
 
     def __init__(self, *args, **kwargs):
         super().__init__()
+        try:
+            self.species = kwargs.pop('species', None)
+        except (TypeError, ValueError):
+            # remove this line when we move beyond tigers
+            self.species = 'Panthera_tigris'
+
         if not self.species:
             raise NotImplementedError('`species` must be defined')
         self.set_aoi_from_ee("{}/{}/{}".format(self.ee_rootdir, self.species, self.ee_aoi))
