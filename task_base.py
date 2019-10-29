@@ -80,7 +80,7 @@ class EETask(Task):
         self._initialize_ee_client()
 
         if not self.ee_rootdir:
-            raise NotImplementedError('`ee_rootdir` must be defined as a property')
+            raise NotImplementedError('`ee_rootdir` must be defined')
         self.ee_rootdir = self.ee_rootdir.strip('/')
         self._create_ee_path(self.ee_rootdir)
 
@@ -164,3 +164,14 @@ class EETask(Task):
                 raise ValueError('unknown task {}'.format(s['id']))
 
         return unfinished_tasks
+
+
+class SCLTask(EETask):
+    species = None
+    ee_aoi = 'aoi'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        if not self.species:
+            raise NotImplementedError('`species` must be defined')
+        self.set_aoi_from_ee("{}/{}/{}".format(self.ee_rootdir, self.species, self.ee_aoi))
