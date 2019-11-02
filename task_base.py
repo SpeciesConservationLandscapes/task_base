@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 class Task(object):
     DATE_FORMAT = '%Y-%m-%d'
-    # list of possible statuses associated with a Task instance -- which is different from ee task statuses
+    # possible statuses associated with a Task instance -- which is different from ee task statuses
     NOTSTARTED = "not started"
     FAILED = "failed"
     RUNNING = "running"
@@ -30,17 +30,18 @@ class Task(object):
     def check_inputs(self):
         pass
 
-    def run_calc(self):
-        raise NotImplementedError('`run_calc` must be defined')
+    def calc(self):
+        raise NotImplementedError('`calc` must be defined')
+
+    def wait(self):
+        pass
 
     def run(self, **kwargs):
-        wait_function = kwargs.pop('wait_function', None)
         self.status = self.RUNNING
         self.check_inputs()
         try:
-            self.run_calc()
-            if wait_function:
-                wait_function()
+            self.calc()
+            self.wait()
             self.status = self.COMPLETE
             print('status: {}'.format(self.status))
         except Exception as e:
@@ -57,21 +58,12 @@ class GeoTask(Task):
              [-180.0, 90.0],
              [-180.0, -90.0]]]]
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     def check_inputs(self):
         super().check_inputs()
         if (not hasattr(self, 'aoi') or not hasattr(self, 'scale') or not hasattr(self, 'crs') or
                 not self.aoi or not self.scale or not self.crs):
             self.status = self.FAILED
             raise NotImplementedError('Undefined input: aoi, scale, or crs')
-
-    def run_calc(self):
-        super().run_calc()
-
-    def run(self, **kwargs):
-        super().run(**kwargs)
 
 
 class EETask(GeoTask):
@@ -87,6 +79,10 @@ class EETask(GeoTask):
     EECANCELLED = 'CANCELLED'
     EEUNKNOWN = 'UNKNOWN'
     EEFINISHED = [EECOMPLETED, EEFAILED, EECANCELLED, EEUNKNOWN]
+
+    IMAGECOLLECTION = "ImageCollection"
+    FEATURECOLLECTION = "FeatureCollection"
+    EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION]
 
     @staticmethod
     def _create_ee_path(asset_path):
@@ -151,18 +147,19 @@ class EETask(GeoTask):
                 print('{} does not exist'.format(ee_input['ee_path']))
                 break
 
-            ic = ee.ImageCollection(ee_input['ee_path'])
-            ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
-            most_recent = ic.filterDate('1900-01-01', ee_taskdate)\
-                .sort('system:time_start', False)\
-                .first()
-            most_recent_date = ee.Date(most_recent.get("system:time_start"))
-            age = ee_taskdate.difference(most_recent_date, 'year').getInfo()
-            if age > ee_input['maxage']:
-                self.status = self.FAILED
-                print('{} most recent image is {} years old (maxage: {})'.format(
-                    ee_input['ee_path'], age, ee_input['maxage']))
-                break
+            if ee_input['ee_type'] == self.IMAGECOLLECTION:
+                ic = ee.ImageCollection(ee_input['ee_path'])
+                ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
+                most_recent = ic.filterDate('1900-01-01', ee_taskdate)\
+                    .sort('system:time_start', False)\
+                    .first()
+                most_recent_date = ee.Date(most_recent.get("system:time_start"))
+                age = ee_taskdate.difference(most_recent_date, 'year').getInfo()
+                if 'maxage' in ee_input and age > ee_input['maxage']:
+                    self.status = self.FAILED
+                    print('{} most recent image is {} years old (maxage: {})'.format(
+                        ee_input['ee_path'], age, ee_input['maxage']))
+                    break
 
     # ee asset property values must currently be numbers or strings
     def flatten_inputs(self):
@@ -194,10 +191,8 @@ class EETask(GeoTask):
         image_export.start()
         self.ee_tasks[image_export.id] = {}
 
-    def run(self, **kwargs):
-        super().run(**dict(kwargs, wait_function=self.wait_for_ee))
-
-    def wait_for_ee(self):
+    def wait(self):
+        super().wait()
         max_sleep = 600
         counter = 3
         while self.ee_tasks:
@@ -229,12 +224,10 @@ class SCLTask(EETask):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        try:
-            self.species = kwargs.pop('species', None)
-        except (TypeError, ValueError):
+        self.species = kwargs.pop('species', None)
+        if not self.species:
             # remove this line when we move beyond tigers
             self.species = 'Panthera_tigris'
+            # raise NotImplementedError('`species` must be defined')
 
-        if not self.species:
-            raise NotImplementedError('`species` must be defined')
         self.set_aoi_from_ee("{}/{}/{}".format(self.ee_rootdir, self.species, self.ee_aoi))
