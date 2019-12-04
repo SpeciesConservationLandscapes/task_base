@@ -82,7 +82,8 @@ class EETask(GeoTask):
 
     IMAGECOLLECTION = "ImageCollection"
     FEATURECOLLECTION = "FeatureCollection"
-    EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION]
+    IMAGE = "Image"
+    EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION, IMAGE]
 
     @staticmethod
     def _create_ee_path(asset_path):
