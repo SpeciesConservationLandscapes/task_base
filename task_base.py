@@ -17,6 +17,14 @@ class Task(object):
     inputs = {}
     wait_for_outputs = True
 
+    def _set_inputs(self):
+        for input_key, i in self.inputs.items():
+            for key, val in i.items():
+                if isinstance(val, str) and hasattr(self.__class__, val):
+                    func = getattr(self.__class__, val)
+                    if callable(func):
+                        self.inputs[input_key][key] = func(self)
+
     def __init__(self, *args, **kwargs):
         _taskdate = datetime.now(timezone.utc).date()
         try:
@@ -26,6 +34,8 @@ class Task(object):
         self.taskdate = _taskdate
 
         self.wait_for_outputs = kwargs.pop('wait_for_outputs', True)
+
+        self._set_inputs()
 
     def check_inputs(self):
         pass
@@ -228,11 +238,11 @@ class SCLTask(EETask):
     ee_aoi = 'aoi'
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.species = kwargs.pop('species', None)
         if not self.species:
             # remove this line when we move beyond tigers
             self.species = 'Panthera_tigris'
             # raise NotImplementedError('`species` must be defined')
 
+        super().__init__(*args, **kwargs)
         self.set_aoi_from_ee("{}/{}/{}".format(self.ee_rootdir, self.species, self.ee_aoi))
