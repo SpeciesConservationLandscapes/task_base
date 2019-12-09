@@ -86,13 +86,17 @@ class EETask(GeoTask):
     EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION, IMAGE]
 
     @staticmethod
-    def _create_ee_path(asset_path):
+    def _create_ee_path(asset_path, ic=False):
         path_segments = asset_path.split('/')
         # first two segments are user/project root (e.g. projects/HII)
-        for i in range(2, len(path_segments)):
+        path_length = len(path_segments)
+        for i in range(2, path_length):
             path = '/'.join(path_segments[:i + 1])
             if not ee.data.getInfo(path):
-                ee.data.createAsset({'type': 'Folder'}, opt_path=path)
+                if i == path_length - 1 and ic:
+                    ee.data.createAsset({'type': 'ImageCollection'}, opt_path=path)
+                else:
+                    ee.data.createAsset({'type': 'Folder'}, opt_path=path)
 
     @staticmethod
     def _canonicalize_assetid(assetid):
@@ -172,11 +176,11 @@ class EETask(GeoTask):
                 return_properties[key] = propval
         return return_properties
 
-    def export_image_ee(self, image, asset_path):
+    def export_image_ee(self, image, asset_path, ic=True):
         image = image.set(self.flatten_inputs())
 
         image_name = asset_path.split('/')[-1]
-        self._create_ee_path('{}/{}'.format(self.ee_rootdir, asset_path))
+        self._create_ee_path('{}/{}'.format(self.ee_rootdir, asset_path), ic)
         asset_id = '{}/{}/{}_{}'.format(self.ee_rootdir, asset_path, image_name, self.taskdate)
         asset_id = self._canonicalize_assetid(asset_id)
 
