@@ -96,8 +96,7 @@ class EETask(GeoTask):
     IMAGE = "Image"
     EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION, IMAGE]
 
-    @staticmethod
-    def _create_ee_path(asset_path, image_collection=False):
+    def _create_ee_path(self, asset_path, image_collection=False):
         path_segments = asset_path.split('/')
         # first two segments are user/project root (e.g. projects/HII)
         path_length = len(path_segments)
@@ -110,8 +109,7 @@ class EETask(GeoTask):
             else:
                 ee.data.createAsset({'type': 'Folder'}, opt_path=path)
 
-    @staticmethod
-    def _canonicalize_assetid(assetid):
+    def _canonicalize_assetid(self, assetid):
         if not ee.data.getInfo(assetid):
             return assetid
         i = 1
