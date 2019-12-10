@@ -17,6 +17,15 @@ class Task(object):
     inputs = {}
     wait_for_outputs = True
 
+    def _set_inputs(self):
+        for input_key, i in self.inputs.items():
+            for key, val in i.items():
+                if not isinstance(val, str) or not hasattr(self.__class__, val):
+                    continue
+                func = getattr(self.__class__, val)
+                if callable(func):
+                    self.inputs[input_key][key] = func(self)
+
     def __init__(self, *args, **kwargs):
         _taskdate = datetime.now(timezone.utc).date()
         try:
@@ -26,6 +35,8 @@ class Task(object):
         self.taskdate = _taskdate
 
         self.wait_for_outputs = kwargs.pop('wait_for_outputs', True)
+
+        self._set_inputs()
 
     def check_inputs(self):
         pass
@@ -85,21 +96,20 @@ class EETask(GeoTask):
     IMAGE = "Image"
     EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION, IMAGE]
 
-    @staticmethod
-    def _create_ee_path(asset_path, ic=False):
+    def _create_ee_path(self, asset_path, image_collection=False):
         path_segments = asset_path.split('/')
         # first two segments are user/project root (e.g. projects/HII)
         path_length = len(path_segments)
         for i in range(2, path_length):
             path = '/'.join(path_segments[:i + 1])
-            if not ee.data.getInfo(path):
-                if i == path_length - 1 and ic:
-                    ee.data.createAsset({'type': 'ImageCollection'}, opt_path=path)
-                else:
-                    ee.data.createAsset({'type': 'Folder'}, opt_path=path)
+            if ee.data.getInfo(path):
+                continue
+            if i == path_length - 1 and image_collection:
+                ee.data.createAsset({'type': 'ImageCollection'}, opt_path=path)
+            else:
+                ee.data.createAsset({'type': 'Folder'}, opt_path=path)
 
-    @staticmethod
-    def _canonicalize_assetid(assetid):
+    def _canonicalize_assetid(self, assetid):
         if not ee.data.getInfo(assetid):
             return assetid
         i = 1
@@ -176,11 +186,11 @@ class EETask(GeoTask):
                 return_properties[key] = propval
         return return_properties
 
-    def export_image_ee(self, image, asset_path, ic=True):
+    def export_image_ee(self, image, asset_path, image_collection=True):
         image = image.set(self.flatten_inputs())
 
         image_name = asset_path.split('/')[-1]
-        self._create_ee_path('{}/{}'.format(self.ee_rootdir, asset_path), ic)
+        self._create_ee_path('{}/{}'.format(self.ee_rootdir, asset_path), image_collection)
         asset_id = '{}/{}/{}_{}'.format(self.ee_rootdir, asset_path, image_name, self.taskdate)
         asset_id = self._canonicalize_assetid(asset_id)
 
@@ -228,11 +238,11 @@ class SCLTask(EETask):
     ee_aoi = 'aoi'
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
         self.species = kwargs.pop('species', None)
         if not self.species:
             # remove this line when we move beyond tigers
             self.species = 'Panthera_tigris'
             # raise NotImplementedError('`species` must be defined')
 
+        super().__init__(*args, **kwargs)
         self.set_aoi_from_ee("{}/{}/{}".format(self.ee_rootdir, self.species, self.ee_aoi))
