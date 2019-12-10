@@ -186,11 +186,11 @@ class EETask(GeoTask):
                 return_properties[key] = propval
         return return_properties
 
-    def export_image_ee(self, image, asset_path, ic=True):
+    def export_image_ee(self, image, asset_path, image_collection=True):
         image = image.set(self.flatten_inputs())
 
         image_name = asset_path.split('/')[-1]
-        self._create_ee_path('{}/{}'.format(self.ee_rootdir, asset_path), ic)
+        self._create_ee_path('{}/{}'.format(self.ee_rootdir, asset_path), image_collection)
         asset_id = '{}/{}/{}_{}'.format(self.ee_rootdir, asset_path, image_name, self.taskdate)
         asset_id = self._canonicalize_assetid(asset_id)
 
