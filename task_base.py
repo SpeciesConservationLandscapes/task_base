@@ -20,10 +20,11 @@ class Task(object):
     def _set_inputs(self):
         for input_key, i in self.inputs.items():
             for key, val in i.items():
-                if isinstance(val, str) and hasattr(self.__class__, val):
-                    func = getattr(self.__class__, val)
-                    if callable(func):
-                        self.inputs[input_key][key] = func(self)
+                if not isinstance(val, str) or not hasattr(self.__class__, val):
+                    continue
+                func = getattr(self.__class__, val)
+                if callable(func):
+                    self.inputs[input_key][key] = func(self)
 
     def __init__(self, *args, **kwargs):
         _taskdate = datetime.now(timezone.utc).date()
@@ -96,17 +97,18 @@ class EETask(GeoTask):
     EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION, IMAGE]
 
     @staticmethod
-    def _create_ee_path(asset_path, ic=False):
+    def _create_ee_path(asset_path, image_collection=False):
         path_segments = asset_path.split('/')
         # first two segments are user/project root (e.g. projects/HII)
         path_length = len(path_segments)
         for i in range(2, path_length):
             path = '/'.join(path_segments[:i + 1])
-            if not ee.data.getInfo(path):
-                if i == path_length - 1 and ic:
-                    ee.data.createAsset({'type': 'ImageCollection'}, opt_path=path)
-                else:
-                    ee.data.createAsset({'type': 'Folder'}, opt_path=path)
+            if ee.data.getInfo(path):
+                continue
+            if i == path_length - 1 and image_collection:
+                ee.data.createAsset({'type': 'ImageCollection'}, opt_path=path)
+            else:
+                ee.data.createAsset({'type': 'Folder'}, opt_path=path)
 
     @staticmethod
     def _canonicalize_assetid(assetid):
