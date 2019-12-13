@@ -206,6 +206,20 @@ class EETask(GeoTask):
         image_export.start()
         self.ee_tasks[image_export.id] = {}
 
+    def export_fc_cloudstorage(self, featurecollection, bucket, asset_path, file_format="GeoJSON"):
+        featurecollection = featurecollection.set(self.flatten_inputs())
+        blob = asset_path.split("/")[-1]
+
+        fc_export = ee.batch.Export.table.toCloudStorage(
+            featurecollection,
+            description=blob,
+            bucket=bucket,
+            fileNamePrefix=asset_path,
+            fileFormat=file_format,
+        )
+        fc_export.start()
+        self.ee_tasks[fc_export.id] = {}
+
     def wait(self):
         super().wait()
         max_sleep = 600
