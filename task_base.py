@@ -139,7 +139,7 @@ class EETask(GeoTask):
         self._create_ee_path(self.ee_rootdir)
 
     def set_aoi_from_ee(self, fc):
-        ee_aoi = ee.Geometry.Polygon(
+        ee_aoi = ee.Geometry.MultiPolygon(
             ee.FeatureCollection(fc).first().geometry().coordinates()
         )
         self.aoi = ee_aoi.getInfo()['coordinates']
@@ -149,7 +149,7 @@ class EETask(GeoTask):
 
         # TODO: test aoi validity outside ee and move this into GeoTask?
         try:
-            ee_aoi = ee.Geometry.Polygon(coords=self.aoi)
+            ee_aoi = ee.Geometry.MultiPolygon(coords=self.aoi)
         except Exception as e:
             self.status = self.FAILED
             raise type(e)(str(e) + ' `aoi` incorrect: {}'.format(self.aoi)) from e
