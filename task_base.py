@@ -172,7 +172,7 @@ class EETask(GeoTask):
                 match = re.search(r'\d{4}-\d{2}-\d{2}$', asset["id"])
                 if match:
                     fcdate = datetime.strptime(match.group(), self.DATE_FORMAT).date()
-                    if not most_recent_fc or fcdate > most_recent_date:
+                    if (not most_recent_fc or fcdate > most_recent_date) and fcdate <= self.taskdate:
                         most_recent_fc = ee.FeatureCollection(asset["id"])
                         most_recent_date = fcdate
 
