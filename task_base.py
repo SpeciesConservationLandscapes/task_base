@@ -63,7 +63,7 @@ class Task(object):
 
 class GeoTask(Task):
     crs = 'EPSG:4326'
-    scale = 300
+    scale = 1000
     aoi = [[[[-180.0, -90.0],
              [180.0, -90.0],
              [180.0, 90.0],
