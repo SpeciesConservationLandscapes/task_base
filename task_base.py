@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import ee
 import time
@@ -144,6 +145,39 @@ class EETask(GeoTask):
         )
         self.aoi = ee_aoi.getInfo()['coordinates']
 
+    # All inputs MUST have `system:time_start` set
+    def get_most_recent_image(self, imagecollection):
+        ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
+        most_recent_image = imagecollection.filterDate('1900-01-01', ee_taskdate) \
+            .sort('system:time_start', False) \
+            .first()
+        most_recent_date = None
+        if most_recent_image:
+            # most_recent_date = datetime.fromtimestamp(most_recent_image.get("system:time_start") / 1000).date()
+            most_recent_date = ee.Date(most_recent_image.get("system:time_start"))
+        return most_recent_image, most_recent_date
+
+    # only use on fcs with SCL naming convention ending in `YYYY-mm-dd`
+    def get_most_recent_featurecollection(self, eedir):
+        most_recent_fc = None
+        most_recent_date = None
+        if not ee.data.getInfo(eedir):
+            return None, None
+        # possible ee api bug requires prepending
+        assetdir = f"projects/earthengine-legacy/assets/{eedir}"
+        assets = ee.data.listAssets({"parent": assetdir})["assets"]
+
+        for asset in assets:
+            if asset["type"] == "TABLE":
+                match = re.search(r'\d{4}-\d{2}-\d{2}$', asset["id"])
+                if match:
+                    fcdate = datetime.strptime(match.group(), self.DATE_FORMAT).date()
+                    if not most_recent_fc or fcdate > most_recent_date:
+                        most_recent_fc = ee.FeatureCollection(asset["id"])
+                        most_recent_date = fcdate
+
+        return most_recent_fc, ee.Date(most_recent_date.strftime(self.DATE_FORMAT))
+
     def check_inputs(self):
         super().check_inputs()
 
@@ -164,11 +198,8 @@ class EETask(GeoTask):
 
             if ee_input['ee_type'] == self.IMAGECOLLECTION:
                 ic = ee.ImageCollection(ee_input['ee_path'])
+                most_recent_image, most_recent_date = self.get_most_recent_image(ic)
                 ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
-                most_recent = ic.filterDate('1900-01-01', ee_taskdate)\
-                    .sort('system:time_start', False)\
-                    .first()
-                most_recent_date = ee.Date(most_recent.get("system:time_start"))
                 age = ee_taskdate.difference(most_recent_date, 'year').getInfo()
                 if 'maxage' in ee_input and age > ee_input['maxage']:
                     self.status = self.FAILED
