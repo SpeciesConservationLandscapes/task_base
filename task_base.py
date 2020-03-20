@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 
 class Task(object):
-    DATE_FORMAT = '%Y-%m-%d'
+    DATE_FORMAT = "%Y-%m-%d"
     # possible statuses associated with a Task instance -- which is different from ee task statuses
     NOTSTARTED = "not started"
     FAILED = "failed"
@@ -30,12 +30,14 @@ class Task(object):
     def __init__(self, *args, **kwargs):
         _taskdate = datetime.now(timezone.utc).date()
         try:
-            _taskdate = datetime.strptime(kwargs.pop('taskdate', None), self.DATE_FORMAT).date()
+            _taskdate = datetime.strptime(
+                kwargs.pop("taskdate", None), self.DATE_FORMAT
+            ).date()
         except (TypeError, ValueError):
             pass
         self.taskdate = _taskdate
 
-        self.wait_for_outputs = kwargs.pop('wait_for_outputs', True)
+        self.wait_for_outputs = kwargs.pop("wait_for_outputs", True)
 
         self._set_inputs()
 
@@ -43,7 +45,7 @@ class Task(object):
         pass
 
     def calc(self):
-        raise NotImplementedError('`calc` must be defined')
+        raise NotImplementedError("`calc` must be defined")
 
     def wait(self):
         pass
@@ -51,45 +53,58 @@ class Task(object):
     def run(self, **kwargs):
         self.status = self.RUNNING
         self.check_inputs()
-        try:
-            self.calc()
-            self.wait()
-            self.status = self.COMPLETE
-            print('status: {}'.format(self.status))
-        except Exception as e:
-            self.status = self.FAILED
-            raise type(e)(str(e)) from e
+        if self.status != self.FAILED:
+            try:
+                self.calc()
+                self.wait()
+                self.status = self.COMPLETE
+            except Exception as e:
+                self.status = self.FAILED
+                raise type(e)(str(e)) from e
+        print("status: {}".format(self.status))
 
 
 class GeoTask(Task):
-    crs = 'EPSG:4326'
+    crs = "EPSG:4326"
     scale = 1000
-    aoi = [[[[-180.0, -90.0],
-             [180.0, -90.0],
-             [180.0, 90.0],
-             [-180.0, 90.0],
-             [-180.0, -90.0]]]]
+    aoi = [
+        [
+            [
+                [-180.0, -90.0],
+                [180.0, -90.0],
+                [180.0, 90.0],
+                [-180.0, 90.0],
+                [-180.0, -90.0],
+            ]
+        ]
+    ]
 
     def check_inputs(self):
         super().check_inputs()
-        if (not hasattr(self, 'aoi') or not hasattr(self, 'scale') or not hasattr(self, 'crs') or
-                not self.aoi or not self.scale or not self.crs):
+        if (
+            not hasattr(self, "aoi")
+            or not hasattr(self, "scale")
+            or not hasattr(self, "crs")
+            or not self.aoi
+            or not self.scale
+            or not self.crs
+        ):
             self.status = self.FAILED
-            raise NotImplementedError('Undefined input: aoi, scale, or crs')
+            raise NotImplementedError("Undefined input: aoi, scale, or crs")
 
 
 class EETask(GeoTask):
-    service_account_key = os.environ.get('SERVICE_ACCOUNT_KEY')
+    service_account_key = os.environ.get("SERVICE_ACCOUNT_KEY")
     ee_rootdir = None
     ee_tasks = {}
     ee_max_pixels = 500000000000
 
-    EEREADY = 'READY'
-    EE = 'RUNNING'
-    EECOMPLETED = 'COMPLETED'
-    EEFAILED = 'FAILED'
-    EECANCELLED = 'CANCELLED'
-    EEUNKNOWN = 'UNKNOWN'
+    EEREADY = "READY"
+    EE = "RUNNING"
+    EECOMPLETED = "COMPLETED"
+    EEFAILED = "FAILED"
+    EECANCELLED = "CANCELLED"
+    EEUNKNOWN = "UNKNOWN"
     EEFINISHED = [EECOMPLETED, EEFAILED, EECANCELLED, EEUNKNOWN]
 
     IMAGECOLLECTION = "ImageCollection"
@@ -98,35 +113,36 @@ class EETask(GeoTask):
     EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION, IMAGE]
 
     def _create_ee_path(self, asset_path, image_collection=False):
-        path_segments = asset_path.split('/')
+        path_segments = asset_path.split("/")
         # first two segments are user/project root (e.g. projects/HII)
         path_length = len(path_segments)
         for i in range(2, path_length):
-            path = '/'.join(path_segments[:i + 1])
+            path = "/".join(path_segments[: i + 1])
             if ee.data.getInfo(path):
                 continue
             if i == path_length - 1 and image_collection:
-                ee.data.createAsset({'type': 'ImageCollection'}, opt_path=path)
+                ee.data.createAsset({"type": "ImageCollection"}, opt_path=path)
             else:
-                ee.data.createAsset({'type': 'Folder'}, opt_path=path)
+                ee.data.createAsset({"type": "Folder"}, opt_path=path)
 
     def _canonicalize_assetid(self, assetid):
         if not ee.data.getInfo(assetid):
             return assetid
         i = 1
-        new_assetid = '{}-{}'.format(assetid, i)
+        new_assetid = "{}-{}".format(assetid, i)
         while ee.data.getInfo(new_assetid):
             i += 1
-            new_assetid = '{}-{}'.format(assetid, i)
+            new_assetid = "{}-{}".format(assetid, i)
         return new_assetid
 
     def _initialize_ee_client(self):
         if self.service_account_key is None:
-            ee.Initialize('persistent')
+            ee.Initialize("persistent")
         else:
-            service_account_name = json.loads(self.service_account_key)['client_email']
-            credentials = ee.ServiceAccountCredentials(service_account_name,
-                                                       key_data=self.service_account_key)
+            service_account_name = json.loads(self.service_account_key)["client_email"]
+            credentials = ee.ServiceAccountCredentials(
+                service_account_name, key_data=self.service_account_key
+            )
             ee.Initialize(credentials)
 
     def __init__(self, *args, **kwargs):
@@ -135,22 +151,24 @@ class EETask(GeoTask):
 
         if not self.ee_rootdir:
             self.status = self.FAILED
-            raise NotImplementedError('`ee_rootdir` must be defined')
-        self.ee_rootdir = self.ee_rootdir.strip('/')
+            raise NotImplementedError("`ee_rootdir` must be defined")
+        self.ee_rootdir = self.ee_rootdir.strip("/")
         self._create_ee_path(self.ee_rootdir)
 
     def set_aoi_from_ee(self, fc):
         ee_aoi = ee.Geometry.MultiPolygon(
             ee.FeatureCollection(fc).first().geometry().coordinates()
         )
-        self.aoi = ee_aoi.getInfo()['coordinates']
+        self.aoi = ee_aoi.getInfo()["coordinates"]
 
     # All inputs MUST have `system:time_start` set
     def get_most_recent_image(self, imagecollection):
         ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
-        most_recent_image = imagecollection.filterDate('1900-01-01', ee_taskdate) \
-            .sort('system:time_start', False) \
+        most_recent_image = (
+            imagecollection.filterDate("1900-01-01", ee_taskdate)
+            .sort("system:time_start", False)
             .first()
+        )
         most_recent_date = None
         if most_recent_image:
             # most_recent_date = datetime.fromtimestamp(most_recent_image.get("system:time_start") / 1000).date()
@@ -169,10 +187,12 @@ class EETask(GeoTask):
 
         for asset in assets:
             if asset["type"] == "TABLE":
-                match = re.search(r'\d{4}-\d{2}-\d{2}$', asset["id"])
+                match = re.search(r"\d{4}-\d{2}-\d{2}$", asset["id"])
                 if match:
                     fcdate = datetime.strptime(match.group(), self.DATE_FORMAT).date()
-                    if (not most_recent_fc or fcdate > most_recent_date) and fcdate <= self.taskdate:
+                    if (
+                        not most_recent_fc or fcdate > most_recent_date
+                    ) and fcdate <= self.taskdate:
                         most_recent_fc = ee.FeatureCollection(asset["id"])
                         most_recent_date = fcdate
 
@@ -186,26 +206,53 @@ class EETask(GeoTask):
             ee_aoi = ee.Geometry.MultiPolygon(coords=self.aoi)
         except Exception as e:
             self.status = self.FAILED
-            raise type(e)(str(e) + ' `aoi` incorrect: {}'.format(self.aoi)) from e
+            raise type(e)(str(e) + " `aoi` incorrect: {}".format(self.aoi)) from e
 
         for key, ee_input in self.inputs.items():
-            if 'ee_path' not in ee_input:
+            if "ee_path" not in ee_input:  # not an EE input
                 continue
 
-            if not ee.data.getInfo(ee_input['ee_path']):
-                print('{} does not exist'.format(ee_input['ee_path']))
-                break
+            if "ee_type" not in ee_input or ee_input["ee_type"] not in self.EEDATATYPES:
+                self.status = self.FAILED
+                print("Missing or invalid ee_type for {}".format(ee_input["ee_path"]))
+                continue
 
-            if ee_input['ee_type'] == self.IMAGECOLLECTION:
-                ic = ee.ImageCollection(ee_input['ee_path'])
-                most_recent_image, most_recent_date = self.get_most_recent_image(ic)
-                ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
-                age = ee_taskdate.difference(most_recent_date, 'year').getInfo()
-                if 'maxage' in ee_input and age > ee_input['maxage']:
-                    self.status = self.FAILED
-                    print('{} most recent image is {} years old (maxage: {})'.format(
-                        ee_input['ee_path'], age, ee_input['maxage']))
-                    break
+            if not ee.data.getInfo(ee_input["ee_path"]):
+                self.status = self.FAILED
+                print("{} does not exist".format(ee_input["ee_path"]))
+                continue
+
+            ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
+            asset = None
+            asset_date = None
+            if ee_input["ee_type"] == self.FEATURECOLLECTION:
+                continue  # TODO: implement fc maxage checking
+            if ee_input["ee_type"] == self.IMAGE:
+                asset = ee.Image(ee_input["ee_path"])
+                asset_date = ee.Date(asset.get("system:time_start"))
+            if ee_input["ee_type"] == self.IMAGECOLLECTION:
+                ic = ee.ImageCollection(ee_input["ee_path"])
+                asset, asset_date = self.get_most_recent_image(ic)
+
+            if asset is None or asset_date is None:
+                self.status = self.FAILED
+                print(
+                    f"Asset {ee_input['ee_path']} has no `system:time_start` property, "
+                    f"or has a date more recent than taskdate {self.taskdate}"
+                )
+                continue
+
+            age = ee_taskdate.difference(asset_date, "year").getInfo()
+            if age < 0:
+                self.status = self.FAILED
+                print(
+                    f"Asset {ee_input['ee_path']} has a date more recent than taskdate {self.taskdate}"
+                )
+            if "maxage" in ee_input and age > ee_input["maxage"]:
+                self.status = self.FAILED
+                print(
+                    f"Asset {ee_input['ee_path']} is {age} years old (maxage: {ee_input['maxage']})"
+                )
 
     # ee asset property values must currently be numbers or strings
     def flatten_inputs(self):
@@ -213,16 +260,20 @@ class EETask(GeoTask):
         for inputkey, properties in self.inputs.items():
             for propkey, propval in properties.items():
                 # I couldn't get ee to accept normal delimiters in key (tried: :|>/~-)
-                key = 'inputsXXX{}XXX{}'.format(inputkey, propkey)
+                key = "inputsXXX{}XXX{}".format(inputkey, propkey)
                 return_properties[key] = propval
         return return_properties
 
     def export_image_ee(self, image, asset_path, image_collection=True):
         image = image.set(self.flatten_inputs())
 
-        image_name = asset_path.split('/')[-1]
-        self._create_ee_path('{}/{}'.format(self.ee_rootdir, asset_path), image_collection)
-        asset_id = '{}/{}/{}_{}'.format(self.ee_rootdir, asset_path, image_name, self.taskdate)
+        image_name = asset_path.split("/")[-1]
+        self._create_ee_path(
+            "{}/{}".format(self.ee_rootdir, asset_path), image_collection
+        )
+        asset_id = "{}/{}/{}_{}".format(
+            self.ee_rootdir, asset_path, image_name, self.taskdate
+        )
         asset_id = self._canonicalize_assetid(asset_id)
 
         image_export = ee.batch.Export.image.toAsset(
@@ -237,7 +288,9 @@ class EETask(GeoTask):
         image_export.start()
         self.ee_tasks[image_export.id] = {}
 
-    def export_fc_cloudstorage(self, featurecollection, bucket, asset_path, file_format="GeoJSON"):
+    def export_fc_cloudstorage(
+        self, featurecollection, bucket, asset_path, file_format="GeoJSON"
+    ):
         featurecollection = featurecollection.set(self.flatten_inputs())
         blob = asset_path.split("/")[-1]
 
@@ -271,23 +324,25 @@ class EETask(GeoTask):
             statuses = ee.data.getTaskStatus(self.ee_tasks.keys())
             print(statuses)
             for s in statuses:
-                if s['state'] in self.EEFINISHED:
-                    del self.ee_tasks[s['id']]
+                if s["state"] in self.EEFINISHED:
+                    del self.ee_tasks[s["id"]]
                     # TODO: log and update self.status based on EECOMPLETED, EEFAILED, EECANCELLED, EEUNKNOWN
                 else:
-                    self.ee_tasks[s['id']] = s
+                    self.ee_tasks[s["id"]] = s
 
 
 class SCLTask(EETask):
     species = None
-    ee_aoi = 'aoi'
+    ee_aoi = "aoi"
 
     def __init__(self, *args, **kwargs):
-        self.species = kwargs.pop('species', None)
+        self.species = kwargs.pop("species", None)
         if not self.species:
             # remove this line when we move beyond tigers
-            self.species = 'Panthera_tigris'
+            self.species = "Panthera_tigris"
             # raise NotImplementedError('`species` must be defined')
 
         super().__init__(*args, **kwargs)
-        self.set_aoi_from_ee("{}/{}/{}".format(self.ee_rootdir, self.species, self.ee_aoi))
+        self.set_aoi_from_ee(
+            "{}/{}/{}".format(self.ee_rootdir, self.species, self.ee_aoi)
+        )
