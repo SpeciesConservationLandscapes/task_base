@@ -266,7 +266,6 @@ class EETask(GeoTask):
 
     def export_image_ee(self, image, asset_path, image_collection=True):
         image = image.set(self.flatten_inputs())
-
         image_name = asset_path.split("/")[-1]
         self._create_ee_path(
             "{}/{}".format(self.ee_rootdir, asset_path), image_collection
@@ -287,6 +286,23 @@ class EETask(GeoTask):
         )
         image_export.start()
         self.ee_tasks[image_export.id] = {}
+
+    def export_fc_ee(self, featurecollection, asset_path):
+        featurecollection = featurecollection.set(self.flatten_inputs())
+        fc_name = asset_path.split("/")[-1]
+        self._create_ee_path(
+            "{}/{}".format(self.ee_rootdir, asset_path)
+        )
+        asset_id = "{}/{}/{}".format(self.ee_rootdir, asset_path, self.taskdate)
+        asset_id = self._canonicalize_assetid(asset_id)
+
+        fc_export = ee.batch.Export.table.toAsset(
+            featurecollection,
+            description=fc_name,
+            assetId=asset_id,
+        )
+        fc_export.start()
+        self.ee_tasks[fc_export.id] = {}
 
     def export_fc_cloudstorage(
         self, featurecollection, bucket, asset_path, file_format="GeoJSON"
