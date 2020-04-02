@@ -241,18 +241,20 @@ class EETask(GeoTask):
                     f"or has a date more recent than taskdate {self.taskdate}"
                 )
                 continue
-
-            age = ee_taskdate.difference(asset_date, "year").getInfo()
-            if age < 0:
-                self.status = self.FAILED
-                print(
-                    f"Asset {ee_input['ee_path']} has a date more recent than taskdate {self.taskdate}"
-                )
-            if "maxage" in ee_input and age > ee_input["maxage"]:
-                self.status = self.FAILED
-                print(
-                    f"Asset {ee_input['ee_path']} is {age} years old (maxage: {ee_input['maxage']})"
-                )
+            else:
+                age = ee_taskdate.difference(asset_date, "year").getInfo()
+                if age < 0:
+                    self.status = self.FAILED
+                    print(
+                        f"Asset {ee_input['ee_path']} has a date more recent than taskdate {self.taskdate}"
+                    )
+                    continue
+                if "maxage" in ee_input and age > ee_input["maxage"]:
+                    self.status = self.FAILED
+                    print(
+                        f"Asset {ee_input['ee_path']} is {age} years old (maxage: {ee_input['maxage']})"
+                    )
+                    continue
 
     # ee asset property values must currently be numbers or strings
     def flatten_inputs(self):
