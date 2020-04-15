@@ -24,14 +24,14 @@ b) a .env file  containing stringified GCP service account authentication detail
 
 Example commands below use `task_hii_popdens` as an example inheriting from this repo.
 - To build docker image:  
-`docker build --pull -t scl/task_hii_popdens .`
+`docker build --pull -t scl3/task_hii_popdens .`
 - To run with your personal ee credentials stored in a .config dir that you've copied from your user dir:  
-`docker run -it -v $PWD/.config:/root/.config scl/task_hii_popdens python task/hii_popdens.py`
+`docker run -it -v $PWD/.config:/root/.config scl3/task_hii_popdens python task/hii_popdens.py`
 - To run with GCP service account credentials:  
-`docker run -it --env-file ./.env scl/task_hii_popdens python task/hii_popdens.py`
+`docker run -it --env-file ./.env scl3/task_hii_popdens python task/hii_popdens.py`
 - To additionally map host code dir to container app dir for development, running `python task/hii_popdens.py` within
  container  
-`docker run -it --env-file ./.env -v $PWD/src:/app scl/task_hii_popdens sh`
+`docker run -it --env-file ./.env -v $PWD/src:/app scl3/task_hii_popdens sh`
 
 ## Classes
 - `Task`: base class defining `taskdate` and other key properties - use for basic pipeline tasks not involving Earth

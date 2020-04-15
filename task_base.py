@@ -8,12 +8,13 @@ from datetime import datetime, timezone
 
 class Task(object):
     DATE_FORMAT = "%Y-%m-%d"
+    ASSET_TIMESTAMP_PROPERTY = "system:time_start"
+
     # possible statuses associated with a Task instance -- which is different from ee task statuses
     NOTSTARTED = "not started"
     FAILED = "failed"
     RUNNING = "running"
     COMPLETE = "complete"
-
     status = NOTSTARTED
     inputs = {}
     wait_for_outputs = True
@@ -166,13 +167,14 @@ class EETask(GeoTask):
         ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
         most_recent_image = (
             imagecollection.filterDate("1900-01-01", ee_taskdate)
-            .sort("system:time_start", False)
+            .sort(self.ASSET_TIMESTAMP_PROPERTY, False)
             .first()
         )
         most_recent_date = None
         if most_recent_image:
-            # most_recent_date = datetime.fromtimestamp(most_recent_image.get("system:time_start") / 1000).date()
-            most_recent_date = ee.Date(most_recent_image.get("system:time_start"))
+            system_timestamp = most_recent_image.get(self.ASSET_TIMESTAMP_PROPERTY).getInfo()
+            if system_timestamp:
+                most_recent_date = ee.Date(system_timestamp)
         return most_recent_image, most_recent_date
 
     # only use on fcs with SCL naming convention ending in `YYYY-mm-dd`
@@ -209,6 +211,7 @@ class EETask(GeoTask):
             raise type(e)(str(e) + " `aoi` incorrect: {}".format(self.aoi)) from e
 
         for key, ee_input in self.inputs.items():
+            continue  # Temporarily disabling ee input date checking
             if "ee_path" not in ee_input:  # not an EE input
                 continue
 
@@ -229,7 +232,9 @@ class EETask(GeoTask):
                 continue  # TODO: implement fc maxage checking
             if ee_input["ee_type"] == self.IMAGE:
                 asset = ee.Image(ee_input["ee_path"])
-                asset_date = ee.Date(asset.get("system:time_start"))
+                system_timestamp = asset.get(self.ASSET_TIMESTAMP_PROPERTY).getInfo()
+                if system_timestamp:
+                    asset_date = ee.Date(system_timestamp)
             if ee_input["ee_type"] == self.IMAGECOLLECTION:
                 ic = ee.ImageCollection(ee_input["ee_path"])
                 asset, asset_date = self.get_most_recent_image(ic)
@@ -237,7 +242,7 @@ class EETask(GeoTask):
             if asset is None or asset_date is None:
                 self.status = self.FAILED
                 print(
-                    f"Asset {ee_input['ee_path']} has no `system:time_start` property, "
+                    f"Asset {ee_input['ee_path']} has no `{self.ASSET_TIMESTAMP_PROPERTY}` property, "
                     f"or has a date more recent than taskdate {self.taskdate}"
                 )
                 continue
