@@ -157,7 +157,7 @@ class EETask(GeoTask):
         self._create_ee_path(self.ee_rootdir)
 
     def set_aoi_from_ee(self, fc):
-        ee_aoi = ee.Geometry.MultiPolygon(
+        ee_aoi = ee.Geometry.Polygon(
             ee.FeatureCollection(fc).first().geometry().coordinates()
         )
         self.aoi = ee_aoi.getInfo()["coordinates"]
