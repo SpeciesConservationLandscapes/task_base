@@ -3,7 +3,7 @@ import re
 import json
 import ee
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 
 class Task(object):
@@ -164,14 +164,16 @@ class EETask(GeoTask):
 
     # All inputs MUST have `system:time_start` set
     def get_most_recent_image(self, imagecollection):
-        ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
+        # ensure date max filter uses 24-hour period of self.taskdate
+        filterdate = self.taskdate + timedelta(days=1)
+        filterdate = ee.Date(filterdate.strftime(self.DATE_FORMAT))
         most_recent_image = (
-            imagecollection.filterDate("1900-01-01", ee_taskdate)
+            imagecollection.filterDate("1900-01-01", filterdate)
             .sort(self.ASSET_TIMESTAMP_PROPERTY, False)
             .first()
         )
         most_recent_date = None
-        if most_recent_image:
+        if most_recent_image.getInfo():
             system_timestamp = most_recent_image.get(self.ASSET_TIMESTAMP_PROPERTY).getInfo()
             if system_timestamp:
                 most_recent_date = ee.Date(system_timestamp)
@@ -211,7 +213,6 @@ class EETask(GeoTask):
             raise type(e)(str(e) + " `aoi` incorrect: {}".format(self.aoi)) from e
 
         for key, ee_input in self.inputs.items():
-            continue  # Temporarily disabling ee input date checking
             if "ee_path" not in ee_input:  # not an EE input
                 continue
 
@@ -239,7 +240,7 @@ class EETask(GeoTask):
                 ic = ee.ImageCollection(ee_input["ee_path"])
                 asset, asset_date = self.get_most_recent_image(ic)
 
-            if asset is None or asset_date is None:
+            if asset.getInfo() is None or asset_date is None:
                 self.status = self.FAILED
                 print(
                     f"Asset {ee_input['ee_path']} has no `{self.ASSET_TIMESTAMP_PROPERTY}` property, "
