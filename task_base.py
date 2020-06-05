@@ -271,8 +271,15 @@ class EETask(GeoTask):
                 return_properties[key] = propval
         return return_properties
 
-    def export_image_ee(self, image, asset_path, image_collection=True):
+    def set_export_metadata(self, image):
+        tasktime = time.strptime(self.taskdate.strftime(self.DATE_FORMAT), self.DATE_FORMAT)
+        epoch = int(time.mktime(tasktime) * 1000)
+        image = image.set(self.ASSET_TIMESTAMP_PROPERTY, epoch)
         image = image.set(self.flatten_inputs())
+        return image
+
+    def export_image_ee(self, image, asset_path, image_collection=True):
+        image = self.set_export_metadata(image)
         image_name = asset_path.split("/")[-1]
         self._create_ee_path(
             "{}/{}".format(self.ee_rootdir, asset_path), image_collection
