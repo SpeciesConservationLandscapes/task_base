@@ -231,9 +231,12 @@ class EETask(GeoTask):
                 continue  # TODO: implement fc maxage checking
             if ee_input["ee_type"] == self.IMAGE:
                 asset = ee.Image(ee_input["ee_path"])
-                system_timestamp = asset.get(self.ASSET_TIMESTAMP_PROPERTY).getInfo()
-                if system_timestamp:
-                    asset_date = ee.Date(system_timestamp)
+                if "static" in ee_input and ee_input["static"] is True:
+                    asset_date = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
+                else:
+                    system_timestamp = asset.get(self.ASSET_TIMESTAMP_PROPERTY).getInfo()
+                    if system_timestamp:
+                        asset_date = ee.Date(system_timestamp)
             if ee_input["ee_type"] == self.IMAGECOLLECTION:
                 ic = ee.ImageCollection(ee_input["ee_path"])
                 asset, asset_date = self.get_most_recent_image(ic)
