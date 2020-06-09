@@ -1,9 +1,9 @@
 import os
 import re
 import json
-import ee
 import time
 from datetime import datetime, timezone, timedelta
+import ee
 
 
 class Task(object):
@@ -266,10 +266,18 @@ class EETask(GeoTask):
     # ee asset property values must currently be numbers or strings
     def flatten_inputs(self):
         return_properties = {}
+        # inputs = dict(itertools.islice(self.inputs.items(), self.EE_MAX_PROPERTIES))
         for inputkey, properties in self.inputs.items():
             for propkey, propval in properties.items():
-                # I couldn't get ee to accept normal delimiters in key (tried: :|>/~-)
-                key = "inputsXXX{}XXX{}".format(inputkey, propkey)
+                # Delimiters: I couldn't get ee to accept normal delimiters in key (tried: :|>/~-)
+                # inputkey[:10] Limiting length of key:
+                # - without limiting: 100 inputs -> 2 inputs converted to properties
+                # - limiting to 10: 20 inputs -> 4 inputs converted to properties
+                # - limiting to 10: 100 inputs -> 10 inputs converted to properties
+                # if I don't export, all properties are set
+                key = "inputs__{}__{}".format(inputkey[:10], propkey)
+                if type(propval) != int and type(propval) != str:
+                    propval = str(propval)
                 return_properties[key] = propval
         return return_properties
 
@@ -277,8 +285,8 @@ class EETask(GeoTask):
         tasktime = time.strptime(self.taskdate.strftime(self.DATE_FORMAT), self.DATE_FORMAT)
         epoch = int(time.mktime(tasktime) * 1000)
         image = image.set(self.ASSET_TIMESTAMP_PROPERTY, epoch)
-        image = image.set(self.flatten_inputs())
-        return image
+        image = image.setMulti(self.flatten_inputs())
+        return ee.Image(image)
 
     def export_image_ee(self, image, asset_path, image_collection=True):
         image = self.set_export_metadata(image)
