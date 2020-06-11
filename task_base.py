@@ -70,11 +70,13 @@ class GeoTask(Task):
     scale = 1000
     aoi = [
         [
-            [-180.0, -90.0],
-            [180.0, -90.0],
-            [180.0, 90.0],
-            [-180.0, 90.0],
-            [-180.0, -90.0],
+            [
+                [-180.0, -90.0],
+                [180.0, -90.0],
+                [180.0, 90.0],
+                [-180.0, 90.0],
+                [-180.0, -90.0],
+            ]
         ]
     ]
 
@@ -155,7 +157,7 @@ class EETask(GeoTask):
         self._create_ee_path(self.ee_rootdir)
 
     def set_aoi_from_ee(self, fc):
-        ee_aoi = ee.Geometry.Polygon(
+        ee_aoi = ee.Geometry.MultiPolygon(
             ee.FeatureCollection(fc).first().geometry().coordinates()
         )
         self.aoi = ee_aoi.getInfo()["coordinates"]
@@ -298,12 +300,13 @@ class EETask(GeoTask):
             self.ee_rootdir, asset_path, image_name, self.taskdate
         )
         asset_id = self._canonicalize_assetid(asset_id)
-
+        extent = ee.Geometry.MultiPolygon(self.aoi).bounds()
+        
         image_export = ee.batch.Export.image.toAsset(
             image,
             description=image_name,
             assetId=asset_id,
-            region=self.aoi,
+            region=extent,
             scale=self.scale,
             crs=self.crs,
             maxPixels=self.ee_max_pixels,
