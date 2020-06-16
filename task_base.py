@@ -317,7 +317,7 @@ class EETask(GeoTask):
         self._create_ee_path(
             "{}/{}".format(self.ee_rootdir, asset_path)
         )
-        asset_id = "{}/{}/{}".format(self.ee_rootdir, asset_path, self.taskdate)
+        asset_id = "{}/{}".format(self.ee_rootdir, asset_path)
         asset_id = self._canonicalize_assetid(asset_id)
 
         fc_export = ee.batch.Export.table.toAsset(
