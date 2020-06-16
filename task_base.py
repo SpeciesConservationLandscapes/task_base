@@ -283,12 +283,17 @@ class EETask(GeoTask):
                 return_properties[key] = propval
         return return_properties
 
-    def set_export_metadata(self, image):
+    def set_export_metadata(self, element, ee_type=IMAGE):
         tasktime = time.strptime(self.taskdate.strftime(self.DATE_FORMAT), self.DATE_FORMAT)
         epoch = int(time.mktime(tasktime) * 1000)
-        image = image.set(self.ASSET_TIMESTAMP_PROPERTY, epoch)
-        image = image.setMulti(self.flatten_inputs())
-        return ee.Image(image)
+        element = element.set(self.ASSET_TIMESTAMP_PROPERTY, epoch)
+        # setMulti returns an Element, not an Image or FeatureCollection
+        element = element.setMulti(self.flatten_inputs())
+        if ee_type == self.IMAGE:
+            return ee.Image(element)
+        elif ee_type == self.FEATURECOLLECTION:
+            return ee.FeatureCollection(element)
+        return None
 
     def export_image_ee(self, image, asset_path, image_collection=True):
         image = self.set_export_metadata(image)
@@ -315,12 +320,12 @@ class EETask(GeoTask):
         self.ee_tasks[image_export.id] = {}
 
     def export_fc_ee(self, featurecollection, asset_path):
-        featurecollection = featurecollection.set(self.flatten_inputs())
-        fc_name = asset_path.split("/")[-1]
-        self._create_ee_path(
-            "{}/{}".format(self.ee_rootdir, asset_path)
-        )
+        featurecollection = self.set_export_metadata(featurecollection, ee_type=self.FEATURECOLLECTION)
+        # print(featurecollection.getInfo()["properties"])
         asset_id = "{}/{}".format(self.ee_rootdir, asset_path)
+        asset_path_segments = asset_path.split("/")
+        fc_name = asset_path_segments[-1]
+        self._create_ee_path("/".join(asset_path_segments[:-1]))
         asset_id = self._canonicalize_assetid(asset_id)
 
         fc_export = ee.batch.Export.table.toAsset(
@@ -334,7 +339,7 @@ class EETask(GeoTask):
     def export_fc_cloudstorage(
         self, featurecollection, bucket, asset_path, file_format="GeoJSON"
     ):
-        featurecollection = featurecollection.set(self.flatten_inputs())
+        featurecollection = self.set_export_metadata(featurecollection, ee_type=self.FEATURECOLLECTION)
         blob = asset_path.split("/")[-1]
 
         fc_export = ee.batch.Export.table.toCloudStorage(
