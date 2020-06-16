@@ -306,7 +306,7 @@ class EETask(GeoTask):
         )
         asset_id = self._canonicalize_assetid(asset_id)
         extent = ee.Geometry.MultiPolygon(self.aoi).bounds()
-        
+
         image_export = ee.batch.Export.image.toAsset(
             image,
             description=image_name,
@@ -323,7 +323,7 @@ class EETask(GeoTask):
         featurecollection = self.set_export_metadata(featurecollection, ee_type=self.FEATURECOLLECTION)
         # print(featurecollection.getInfo()["properties"])
         asset_id = "{}/{}".format(self.ee_rootdir, asset_path)
-        asset_path_segments = asset_path.split("/")
+        asset_path_segments = asset_id.split("/")
         fc_name = asset_path_segments[-1]
         self._create_ee_path("/".join(asset_path_segments[:-1]))
         asset_id = self._canonicalize_assetid(asset_id)
