@@ -24,7 +24,7 @@ b) a .env file  containing stringified GCP service account authentication detail
 
 Example commands below use `task_hii_popdens` as an example inheriting from this repo.
 - To build docker image:  
-`docker build --pull -t scl3/task_hii_popdens .`
+`docker build --pull --no-cache -t scl3/task_hii_popdens .`
 - To run with your personal ee credentials stored in a .config dir that you've copied from your user dir:  
 `docker run -it -v $PWD/.config:/root/.config scl3/task_hii_popdens python task/hii_popdens.py`
 - To run with GCP service account credentials:  
