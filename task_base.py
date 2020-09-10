@@ -6,6 +6,9 @@ from datetime import datetime, timezone, timedelta
 import ee
 
 
+PROJECTS = "projects"
+
+
 class Task(object):
     DATE_FORMAT = "%Y-%m-%d"
     ASSET_TIMESTAMP_PROPERTY = "system:time_start"
@@ -96,6 +99,7 @@ class GeoTask(Task):
 
 class EETask(GeoTask):
     service_account_key = os.environ.get("SERVICE_ACCOUNT_KEY")
+    ee_project = None
     ee_rootdir = None
     ee_tasks = {}
     ee_max_pixels = 500000000000
@@ -108,7 +112,7 @@ class EETask(GeoTask):
     EEUNKNOWN = "UNKNOWN"
     EEFINISHED = [EECOMPLETED, EEFAILED, EECANCELLED, EEUNKNOWN]
 
-    IMAGECOLLECTION = "ImageCollection"
+    IMAGECOLLECTION = ee.data.ASSET_TYPE_IMAGE_COLL
     FEATURECOLLECTION = "FeatureCollection"
     IMAGE = "Image"
     EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION, IMAGE]
@@ -146,16 +150,54 @@ class EETask(GeoTask):
             )
             ee.Initialize(credentials)
 
+    def _list_assets(self, eedir):
+        assets = None
+        # possible ee api bug requires prepending
+        assetdir = f"projects/earthengine-legacy/assets/{eedir}"
+        try:
+            assets = ee.data.listAssets({"parent": assetdir})["assets"]
+        except ee.ee_exception.EEException:
+            print(f"Folder {eedir} does not exist or is not a folder.")
+        return assets
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._initialize_ee_client()
 
-        if not self.ee_rootdir:
+        if not self.ee_project:
             self.status = self.FAILED
-            raise NotImplementedError("`ee_rootdir` must be defined")
+            raise NotImplementedError("`ee_project` must be defined")
+
+        self.ee_rootdir = kwargs.pop("ee_rootdir", None)
+        if not self.ee_rootdir:
+            self.ee_rootdir = f"{PROJECTS}/{self.ee_project}"
         self.ee_rootdir = self.ee_rootdir.strip("/")
         self._create_ee_path(self.ee_rootdir)
 
+    # def rm(self, asset_path):
+    #     asset = ee.data.getInfo(asset_path)
+    #     if not asset:
+    #         return
+    #
+    #     if (
+    #         asset["type"].capitalize() == ee.data.ASSET_TYPE_FOLDER
+    #         or asset["type"].capitalize() == ee.data.ASSET_TYPE_IMAGE_COLL
+    #     ):
+    #         print(asset["type"].capitalize(), ee.data.ASSET_TYPE_FOLDER)
+    #         for child_asset in self._list_assets(asset_path):
+    #             self.rm(f"{asset_path}/{child_asset}")
+    #     print(asset)
+    #
+    #     ee.data.deleteAsset(asset_path)
+    #     return True
+    #
+    # def cp(self, source_id, destination_id, overwrite=True):
+    #     destination_dir = "/".join(destination_id.split("/")[:-1])
+    #     if not ee.data.getInfo(source_id) or not ee.data.getInfo(destination_dir):
+    #         print(f"{source_id} or {destination_id} is not valid")
+    #         return
+    #     ee.data.copyAsset(source_id, destination_id, overwrite)
+    #
     def set_aoi_from_ee(self, fc):
         ee_aoi = ee.Geometry.MultiPolygon(
             ee.FeatureCollection(fc).first().geometry().coordinates()
@@ -174,7 +216,9 @@ class EETask(GeoTask):
         )
         most_recent_date = None
         if most_recent_image.getInfo():
-            system_timestamp = most_recent_image.get(self.ASSET_TIMESTAMP_PROPERTY).getInfo()
+            system_timestamp = most_recent_image.get(
+                self.ASSET_TIMESTAMP_PROPERTY
+            ).getInfo()
             if system_timestamp:
                 most_recent_date = ee.Date(system_timestamp)
         return most_recent_image, most_recent_date
@@ -185,9 +229,7 @@ class EETask(GeoTask):
         most_recent_date = None
         if not ee.data.getInfo(eedir):
             return None, None
-        # possible ee api bug requires prepending
-        assetdir = f"projects/earthengine-legacy/assets/{eedir}"
-        assets = ee.data.listAssets({"parent": assetdir})["assets"]
+        assets = self._list_assets(eedir)
 
         for asset in assets:
             if asset["type"] == "TABLE":
@@ -236,7 +278,9 @@ class EETask(GeoTask):
                 if "static" in ee_input and ee_input["static"] is True:
                     asset_date = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
                 else:
-                    system_timestamp = asset.get(self.ASSET_TIMESTAMP_PROPERTY).getInfo()
+                    system_timestamp = asset.get(
+                        self.ASSET_TIMESTAMP_PROPERTY
+                    ).getInfo()
                     if system_timestamp:
                         asset_date = ee.Date(system_timestamp)
             if ee_input["ee_type"] == self.IMAGECOLLECTION:
@@ -284,7 +328,9 @@ class EETask(GeoTask):
         return return_properties
 
     def set_export_metadata(self, element, ee_type=IMAGE):
-        tasktime = time.strptime(self.taskdate.strftime(self.DATE_FORMAT), self.DATE_FORMAT)
+        tasktime = time.strptime(
+            self.taskdate.strftime(self.DATE_FORMAT), self.DATE_FORMAT
+        )
         epoch = int(time.mktime(tasktime) * 1000)
         element = element.set(self.ASSET_TIMESTAMP_PROPERTY, epoch)
         # setMulti returns an Element, not an Image or FeatureCollection
@@ -320,7 +366,9 @@ class EETask(GeoTask):
         self.ee_tasks[image_export.id] = {}
 
     def export_fc_ee(self, featurecollection, asset_path):
-        featurecollection = self.set_export_metadata(featurecollection, ee_type=self.FEATURECOLLECTION)
+        featurecollection = self.set_export_metadata(
+            featurecollection, ee_type=self.FEATURECOLLECTION
+        )
         # print(featurecollection.getInfo()["properties"])
         asset_id = "{}/{}".format(self.ee_rootdir, asset_path)
         asset_path_segments = asset_id.split("/")
@@ -329,9 +377,7 @@ class EETask(GeoTask):
         asset_id = self._canonicalize_assetid(asset_id)
 
         fc_export = ee.batch.Export.table.toAsset(
-            featurecollection,
-            description=fc_name,
-            assetId=asset_id,
+            featurecollection, description=fc_name, assetId=asset_id
         )
         fc_export.start()
         self.ee_tasks[fc_export.id] = {}
@@ -339,7 +385,9 @@ class EETask(GeoTask):
     def export_fc_cloudstorage(
         self, featurecollection, bucket, asset_path, file_format="GeoJSON"
     ):
-        featurecollection = self.set_export_metadata(featurecollection, ee_type=self.FEATURECOLLECTION)
+        featurecollection = self.set_export_metadata(
+            featurecollection, ee_type=self.FEATURECOLLECTION
+        )
         blob = asset_path.split("/")[-1]
 
         fc_export = ee.batch.Export.table.toCloudStorage(
@@ -380,8 +428,34 @@ class EETask(GeoTask):
 
 
 class SCLTask(EETask):
+    SPECIES = "species"
+    RESTORATION = "restoration"
+    SURVEY = "survey"
+    FRAGMENT = "fragment"
+    LANDSCAPE_TYPES = [SPECIES, RESTORATION, SURVEY, FRAGMENT]
+    CANONICAL = "canonical"
+
+    ee_project = "SCL/v1"
     species = None
+    scenario = None
     ee_aoi = "aoi"
+
+    def _scl_path(self, scltype):
+        if scltype is None or scltype not in self.inputs:
+            raise TypeError("Missing or incorrect scltype for setting scl path")
+        return f"{self.ee_rootdir}/scl_poly/{self.taskdate}/{scltype}"
+
+    def scl_path_species(self):
+        return self._scl_path(f"scl_{self.SPECIES}")
+
+    def scl_path_restoration(self):
+        return self._scl_path(f"scl_{self.RESTORATION}")
+
+    def scl_path_survey(self):
+        return self._scl_path(f"scl_{self.SURVEY}")
+
+    def scl_path_fragment(self):
+        return self._scl_path(f"scl_{self.FRAGMENT}")
 
     def __init__(self, *args, **kwargs):
         self.species = kwargs.pop("species", None)
@@ -390,7 +464,12 @@ class SCLTask(EETask):
             self.species = "Panthera_tigris"
             # raise NotImplementedError('`species` must be defined')
 
+        self.scenario = kwargs.pop("scenario", self.CANONICAL)
+
         super().__init__(*args, **kwargs)
-        self.set_aoi_from_ee(
-            "{}/{}/{}".format(self.ee_rootdir, self.species, self.ee_aoi)
-        )
+        self.ee_rootdir = f"{self.ee_rootdir}/{self.species}/{self.scenario}"
+        self.set_aoi_from_ee("{}/{}".format(self.ee_rootdir, self.ee_aoi))
+
+
+class HIITask(EETask):
+    ee_project = "HII/v1"
