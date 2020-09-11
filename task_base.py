@@ -467,7 +467,7 @@ class SCLTask(EETask):
         self.scenario = kwargs.pop("scenario", self.CANONICAL)
 
         super().__init__(*args, **kwargs)
-        self.ee_rootdir = f"{self.ee_rootdir}/{self.species}/{self.scenario}"
+        self.ee_rootdir = f"{self.ee_rootdir}/{self.species}"
         self.set_aoi_from_ee("{}/{}".format(self.ee_rootdir, self.ee_aoi))
 
 
