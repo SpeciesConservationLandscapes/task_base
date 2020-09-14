@@ -82,6 +82,7 @@ class GeoTask(Task):
             ]
         ]
     ]
+    extent = aoi[0][0]
 
     def check_inputs(self):
         super().check_inputs()
@@ -198,11 +199,19 @@ class EETask(GeoTask):
     #         return
     #     ee.data.copyAsset(source_id, destination_id, overwrite)
     #
-    def set_aoi_from_ee(self, fc):
-        ee_aoi = ee.Geometry.MultiPolygon(
-            ee.FeatureCollection(fc).first().geometry().coordinates()
-        )
-        self.aoi = ee_aoi.getInfo()["coordinates"]
+    def set_aoi_from_ee(self, asset):
+        try:  # seeting aoi from FeatureCollection
+            ee_aoi = ee.Geometry.MultiPolygon(
+                ee.FeatureCollection(asset).first().geometry().coordinates()
+            )
+            self.aoi = ee_aoi.getInfo()["coordinates"]
+            self.extent = ee.Geometry.MultiPolygon(self.aoi).bounds()
+        except ee.ee_exception.EEException:  # setting aoi from Image
+            ee_aoi = ee.Image(asset)
+            self.aoi = self.extent = ee_aoi.geometry().bounds()
+        except Exception as e:
+            self.status = self.FAILED
+            raise type(e)(str(e) + " `set_aoi_from_ee` asset is neither a FeatureCollection nor an Image path") from e
 
     # All inputs MUST have `system:time_start` set
     def get_most_recent_image(self, imagecollection):
@@ -351,13 +360,12 @@ class EETask(GeoTask):
             self.ee_rootdir, asset_path, image_name, self.taskdate
         )
         asset_id = self._canonicalize_assetid(asset_id)
-        extent = ee.Geometry.MultiPolygon(self.aoi).bounds()
 
         image_export = ee.batch.Export.image.toAsset(
             image,
             description=image_name,
             assetId=asset_id,
-            region=extent,
+            region=self.extent,
             scale=self.scale,
             crs=self.crs,
             maxPixels=self.ee_max_pixels,
@@ -438,7 +446,7 @@ class SCLTask(EETask):
     ee_project = "SCL/v1"
     species = None
     scenario = None
-    ee_aoi = "aoi"
+    ee_aoi = "historical_range_img_200914"
 
     def _scl_path(self, scltype):
         if scltype is None or scltype not in self.inputs:
