@@ -132,6 +132,8 @@ class EETask(GeoTask):
                 ee.data.createAsset({"type": "Folder"}, opt_path=path)
 
     def _canonicalize_assetid(self, assetid):
+        path_segments = [s.replace(" ", "_") for s in assetid.split("/")]
+        assetid = "/".join(path_segments)
         if not ee.data.getInfo(assetid):
             return assetid
         i = 1
@@ -280,21 +282,22 @@ class EETask(GeoTask):
             ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
             asset = None
             asset_date = None
-            if ee_input["ee_type"] == self.FEATURECOLLECTION:
-                continue  # TODO: implement fc maxage checking
-            if ee_input["ee_type"] == self.IMAGE:
-                asset = ee.Image(ee_input["ee_path"])
-                if "static" in ee_input and ee_input["static"] is True:
-                    asset_date = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
-                else:
+            if "static" in ee_input and ee_input["static"] is True:
+                asset_date = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
+                continue
+            else:
+                if ee_input["ee_type"] == self.FEATURECOLLECTION:
+                    continue  # TODO: implement fc maxage checking
+                if ee_input["ee_type"] == self.IMAGE:
+                    asset = ee.Image(ee_input["ee_path"])
                     system_timestamp = asset.get(
                         self.ASSET_TIMESTAMP_PROPERTY
                     ).getInfo()
                     if system_timestamp:
                         asset_date = ee.Date(system_timestamp)
-            if ee_input["ee_type"] == self.IMAGECOLLECTION:
-                ic = ee.ImageCollection(ee_input["ee_path"])
-                asset, asset_date = self.get_most_recent_image(ic)
+                if ee_input["ee_type"] == self.IMAGECOLLECTION:
+                    ic = ee.ImageCollection(ee_input["ee_path"])
+                    asset, asset_date = self.get_most_recent_image(ic)
 
             if asset.getInfo() is None or asset_date is None:
                 self.status = self.FAILED
