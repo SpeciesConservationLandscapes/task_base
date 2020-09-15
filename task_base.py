@@ -164,9 +164,6 @@ class EETask(GeoTask):
         return assets
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._initialize_ee_client()
-
         if not self.ee_project:
             self.status = self.FAILED
             raise NotImplementedError("`ee_project` must be defined")
@@ -176,6 +173,9 @@ class EETask(GeoTask):
             self.ee_rootdir = f"{PROJECTS}/{self.ee_project}"
         self.ee_rootdir = self.ee_rootdir.strip("/")
         self._create_ee_path(self.ee_rootdir)
+
+        super().__init__(*args, **kwargs)
+        self._initialize_ee_client()
 
     # def rm(self, asset_path):
     #     asset = ee.data.getInfo(asset_path)
