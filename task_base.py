@@ -480,6 +480,8 @@ class SCLTask(EETask):
 
         super().__init__(*args, **kwargs)
         self.ee_rootdir = f"{self.ee_rootdir}/{self.species}"
+        # call again to handle any callables in self.inputs that rely on scenario
+        self._set_inputs()
         self.set_aoi_from_ee("{}/{}".format(self.ee_rootdir, self.ee_aoi))
 
 
