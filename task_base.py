@@ -354,7 +354,7 @@ class EETask(GeoTask):
             return ee.FeatureCollection(element)
         return None
 
-    def export_image_ee(self, image, asset_path, image_collection=True):
+    def export_image_ee(self, image, asset_path, image_collection=True, region=None):
         image = self.set_export_metadata(image)
         image_name = asset_path.split("/")[-1]
         self._create_ee_path(
@@ -365,11 +365,14 @@ class EETask(GeoTask):
         )
         asset_id = self._canonicalize_assetid(asset_id)
 
+        if not region:
+            region = self.extent
+
         image_export = ee.batch.Export.image.toAsset(
             image,
             description=image_name,
             assetId=asset_id,
-            region=self.extent,
+            region=region,
             scale=self.scale,
             crs=self.crs,
             maxPixels=self.ee_max_pixels,
