@@ -479,7 +479,7 @@ class SCLTask(EETask):
         self.scenario = kwargs.pop("scenario", self.CANONICAL)
 
         super().__init__(*args, **kwargs)
-        self.ee_rootdir = f"{self.ee_rootdir}/{self.species}/{self.scenario}"
+        self.ee_rootdir = self._canonicalize_assetid(f"{self.ee_rootdir}/{self.species}/{self.scenario}")
         # call again to handle any callables in self.inputs that rely on scenario
         self._set_inputs()
         self.set_aoi_from_ee("{}/{}".format(self.ee_rootdir, self.ee_aoi))
