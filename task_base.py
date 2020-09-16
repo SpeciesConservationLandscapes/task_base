@@ -478,11 +478,11 @@ class SCLTask(EETask):
 
         self.scenario = kwargs.pop("scenario", self.CANONICAL)
 
-        super().__init__(*args, **kwargs)
-        self.ee_rootdir = self._canonicalize_assetid(f"{self.ee_rootdir}/{self.species}/{self.scenario}")
-        # call again to handle any callables in self.inputs that rely on scenario
-        self._set_inputs()
-        self.set_aoi_from_ee("{}/{}".format(self.ee_rootdir, self.ee_aoi))
+        ee_rootdir = f"{PROJECTS}/{self.ee_project}/{self.species}/{self.scenario}"
+        path_segments = [s.replace(" ", "_") for s in ee_rootdir.split("/")]
+        ee_rootdir = "/".join(path_segments)
+        super().__init__(*args, ee_rootdir=ee_rootdir, **kwargs)
+        self.set_aoi_from_ee(f"{PROJECTS}/{self.ee_project}/{self.species}/{self.ee_aoi}")
 
 
 class HIITask(EETask):
