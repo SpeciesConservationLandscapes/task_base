@@ -118,7 +118,23 @@ class EETask(GeoTask):
     IMAGE = "Image"
     EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION, IMAGE]
 
-    def _create_ee_path(self, asset_path, image_collection=False):
+    def _canonicalize_assetid(self, assetid):
+        path_segments = [s.replace(" ", "_") for s in assetid.split("/")]
+        assetid = "/".join(path_segments)
+        if not ee.data.getInfo(assetid):
+            return assetid
+        i = 1
+        new_assetid = "{}-{}".format(assetid, i)
+        while ee.data.getInfo(new_assetid):
+            i += 1
+            new_assetid = "{}-{}".format(assetid, i)
+        return new_assetid
+
+    def _prep_asset_id(self, asset_path, image_collection=False):
+        asset_path = f"{self.ee_rootdir}/{asset_path}"
+        asset_name = asset_path.split("/")[-1]
+        asset_id = self._canonicalize_assetid(f"{asset_path}/{asset_name}_{self.taskdate}")
+
         path_segments = asset_path.split("/")
         # first two segments are user/project root (e.g. projects/HII)
         path_length = len(path_segments)
@@ -131,17 +147,7 @@ class EETask(GeoTask):
             else:
                 ee.data.createAsset({"type": "Folder"}, opt_path=path)
 
-    def _canonicalize_assetid(self, assetid):
-        path_segments = [s.replace(" ", "_") for s in assetid.split("/")]
-        assetid = "/".join(path_segments)
-        if not ee.data.getInfo(assetid):
-            return assetid
-        i = 1
-        new_assetid = "{}-{}".format(assetid, i)
-        while ee.data.getInfo(new_assetid):
-            i += 1
-            new_assetid = "{}-{}".format(assetid, i)
-        return new_assetid
+        return asset_name, asset_id
 
     def _initialize_ee_client(self):
         if self.service_account_key is None:
@@ -174,7 +180,6 @@ class EETask(GeoTask):
         if not self.ee_rootdir:
             self.ee_rootdir = f"{PROJECTS}/{self.ee_project}"
         self.ee_rootdir = self.ee_rootdir.strip("/")
-        self._create_ee_path(self.ee_rootdir)
 
         super().__init__(*args, **kwargs)
 
@@ -287,8 +292,7 @@ class EETask(GeoTask):
                 asset_date = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
                 continue
             else:
-                if ee_input["ee_type"] == self.FEATURECOLLECTION:
-                    continue  # TODO: implement fc maxage checking
+                # no abstract featureCollection maxage checking; implement in inheritor specific to input
                 if ee_input["ee_type"] == self.IMAGE:
                     asset = ee.Image(ee_input["ee_path"])
                     system_timestamp = asset.get(
@@ -354,17 +358,15 @@ class EETask(GeoTask):
             return ee.FeatureCollection(element)
         return None
 
+    # export_image_ee - appends date to asset name AND sets system:start in properties.
+    #   get_most_recent_image and check_inputs use the latter
+    # export_fc_ee - ONLY appends date to asset name (can't set fc meta properties)
+    #   get_most_recent_featurecollection uses date appended to name; check_inputs not implemented
+    # export_fc_cloudstorage - no date or other name manipulation. No implementation of `most_recent` or check_inputs.
+
     def export_image_ee(self, image, asset_path, image_collection=True, region=None):
         image = self.set_export_metadata(image)
-        image_name = asset_path.split("/")[-1]
-        self._create_ee_path(
-            "{}/{}".format(self.ee_rootdir, asset_path), image_collection
-        )
-        asset_id = "{}/{}/{}_{}".format(
-            self.ee_rootdir, asset_path, image_name, self.taskdate
-        )
-        asset_id = self._canonicalize_assetid(asset_id)
-
+        image_name, asset_id = self._prep_asset_id(asset_path, image_collection)
         if not region:
             region = self.extent
 
@@ -385,11 +387,7 @@ class EETask(GeoTask):
             featurecollection, ee_type=self.FEATURECOLLECTION
         )
         # print(featurecollection.getInfo()["properties"])
-        asset_id = "{}/{}".format(self.ee_rootdir, asset_path)
-        asset_path_segments = asset_id.split("/")
-        fc_name = asset_path_segments[-1]
-        self._create_ee_path("/".join(asset_path_segments[:-1]))
-        asset_id = self._canonicalize_assetid(asset_id)
+        fc_name, asset_id = self._prep_asset_id(asset_path)
 
         fc_export = ee.batch.Export.table.toAsset(
             featurecollection, description=fc_name, assetId=asset_id
@@ -456,21 +454,21 @@ class SCLTask(EETask):
     ee_aoi = "historical_range_img_200914"
 
     def _scl_path(self, scltype):
-        if scltype is None or scltype not in self.inputs:
+        if scltype is None or scltype not in self.LANDSCAPE_TYPES:
             raise TypeError("Missing or incorrect scltype for setting scl path")
-        return f"{self.ee_rootdir}/scl_poly/{self.taskdate}/{scltype}"
+        return f"{self.ee_rootdir}/pothab/scl_{scltype}"
 
     def scl_path_species(self):
-        return self._scl_path(f"scl_{self.SPECIES}")
+        return self._scl_path(self.SPECIES)
 
     def scl_path_restoration(self):
-        return self._scl_path(f"scl_{self.RESTORATION}")
+        return self._scl_path(self.RESTORATION)
 
     def scl_path_survey(self):
-        return self._scl_path(f"scl_{self.SURVEY}")
+        return self._scl_path(self.SURVEY)
 
     def scl_path_fragment(self):
-        return self._scl_path(f"scl_{self.FRAGMENT}")
+        return self._scl_path(self.FRAGMENT)
 
     def __init__(self, *args, **kwargs):
         self.species = kwargs.pop("species", None)
