@@ -5,7 +5,6 @@ import time
 from datetime import datetime, timezone, timedelta
 import ee
 
-
 PROJECTS = "projects"
 
 
@@ -133,7 +132,9 @@ class EETask(GeoTask):
     def _prep_asset_id(self, asset_path, image_collection=False):
         asset_path = f"{self.ee_rootdir}/{asset_path}"
         asset_name = asset_path.split("/")[-1]
-        asset_id = self._canonicalize_assetid(f"{asset_path}/{asset_name}_{self.taskdate}")
+        asset_id = self._canonicalize_assetid(
+            f"{asset_path}/{asset_name}_{self.taskdate}"
+        )
 
         path_segments = asset_path.split("/")
         # first two segments are user/project root (e.g. projects/HII)
@@ -208,18 +209,27 @@ class EETask(GeoTask):
     #     ee.data.copyAsset(source_id, destination_id, overwrite)
     #
     def set_aoi_from_ee(self, asset):
-        try:  # seeting aoi from FeatureCollection
+        try:  # setting aoi from FeatureCollection
             ee_aoi = ee.Geometry.MultiPolygon(
-                ee.FeatureCollection(asset).first().geometry().coordinates()
+                ee.FeatureCollection(asset).first().geometry().coordinates(),
+                proj=self.crs,
+                geodesic=False,
             )
             self.aoi = ee_aoi.getInfo()["coordinates"]
-            self.extent = ee.Geometry.MultiPolygon(self.aoi).bounds()
+            self.extent = (
+                ee.Geometry.MultiPolygon(self.aoi, proj=self.crs, geodesic=False)
+                .bounds()
+                .getInfo()["coordinates"]
+            )
         except ee.ee_exception.EEException:  # setting aoi from Image
             ee_aoi = ee.Image(asset)
-            self.aoi = self.extent = ee_aoi.geometry().bounds()
+            self.aoi = self.extent = ee_aoi.geometry().bounds().getInfo()["coordinates"]
         except Exception as e:
             self.status = self.FAILED
-            raise type(e)(str(e) + " `set_aoi_from_ee` asset is neither a FeatureCollection nor an Image path") from e
+            raise type(e)(
+                str(e)
+                + " `set_aoi_from_ee` asset is neither a FeatureCollection nor an Image path"
+            ) from e
 
     # All inputs MUST have `system:time_start` set
     def get_most_recent_image(self, imagecollection):
@@ -266,7 +276,9 @@ class EETask(GeoTask):
 
         # TODO: test aoi validity outside ee and move this into GeoTask?
         try:
-            ee_aoi = ee.Geometry.MultiPolygon(coords=self.aoi)
+            ee_aoi = ee.Geometry.MultiPolygon(
+                coords=self.aoi, proj=self.crs, geodesic=False
+            )
         except Exception as e:
             self.status = self.FAILED
             raise type(e)(str(e) + " `aoi` incorrect: {}".format(self.aoi)) from e
@@ -483,7 +495,9 @@ class SCLTask(EETask):
         path_segments = [s.replace(" ", "_") for s in ee_rootdir.split("/")]
         ee_rootdir = "/".join(path_segments)
         super().__init__(*args, ee_rootdir=ee_rootdir, **kwargs)
-        self.set_aoi_from_ee(f"{PROJECTS}/{self.ee_project}/{self.species}/{self.ee_aoi}")
+        self.set_aoi_from_ee(
+            f"{PROJECTS}/{self.ee_project}/{self.species}/{self.ee_aoi}"
+        )
 
 
 class HIITask(EETask):
