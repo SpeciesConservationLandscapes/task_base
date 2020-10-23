@@ -4,6 +4,7 @@ import json
 import time
 from datetime import datetime, timezone, timedelta
 import ee
+import git
 
 PROJECTS = "projects"
 
@@ -362,6 +363,11 @@ class EETask(GeoTask):
         )
         epoch = int(time.mktime(tasktime) * 1000)
         element = element.set(self.ASSET_TIMESTAMP_PROPERTY, epoch)
+
+        repo = git.Repo(search_parent_directories=True)
+        sha = repo.head.object.hexsha
+        element = element.set("sha", sha)
+
         # setMulti returns an Element, not an Image or FeatureCollection
         element = element.setMulti(self.flatten_inputs())
         if ee_type == self.IMAGE:
