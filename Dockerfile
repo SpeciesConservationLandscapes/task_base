@@ -18,5 +18,5 @@ RUN set -ex \
         git \
         less \
         nano \
-    && pip install earthengine-api
+    && pip install earthengine-api \
     && pip install gitpython
