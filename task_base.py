@@ -4,7 +4,7 @@ import json
 import time
 from datetime import datetime, timezone, timedelta
 import ee
-# import git
+import git
 
 PROJECTS = "projects"
 
@@ -54,17 +54,23 @@ class Task(object):
     def wait(self):
         pass
 
+    def clean_up(self, **kwargs):
+        pass
+
     def run(self, **kwargs):
-        self.status = self.RUNNING
-        self.check_inputs()
-        if self.status != self.FAILED:
-            try:
-                self.calc()
-                self.wait()
-                self.status = self.COMPLETE
-            except Exception as e:
-                self.status = self.FAILED
-                raise type(e)(str(e)) from e
+        try:
+            self.status = self.RUNNING
+            self.check_inputs()
+            if self.status != self.FAILED:
+                try:
+                    self.calc()
+                    self.wait()
+                    self.status = self.COMPLETE
+                except Exception as e:
+                    self.status = self.FAILED
+                    raise type(e)(str(e)) from e
+        finally:
+            self.clean_up()
         print("status: {}".format(self.status))
 
 
@@ -364,9 +370,12 @@ class EETask(GeoTask):
         epoch = int(time.mktime(tasktime) * 1000)
         element = element.set(self.ASSET_TIMESTAMP_PROPERTY, epoch)
 
-        # repo = git.Repo(search_parent_directories=True)
-        # sha = repo.head.object.hexsha
-        # element = element.set("sha", sha)
+        try:  # pass in `-v $PWD/.git:/app/.git` to docker command to write commit SHA to asset properties
+            repo = git.Repo(search_parent_directories=True)
+            sha = repo.head.object.hexsha
+            element = element.set("sha", sha)
+        except Exception as e:
+            pass
 
         # setMulti returns an Element, not an Image or FeatureCollection
         element = element.setMulti(self.flatten_inputs())
@@ -382,11 +391,17 @@ class EETask(GeoTask):
     #   get_most_recent_featurecollection uses date appended to name; check_inputs not implemented
     # export_fc_cloudstorage - no date or other name manipulation. No implementation of `most_recent` or check_inputs.
 
-    def export_image_ee(self, image, asset_path, image_collection=True, region=None):
+    def export_image_ee(
+        self, image, asset_path, image_collection=True, region=None, pyramiding=None
+    ):
         image = self.set_export_metadata(image)
         image_name, asset_id = self._prep_asset_id(asset_path, image_collection)
-        if not region:
+        if region is None:
             region = self.extent
+        if isinstance(region, list):
+            region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
+        if pyramiding is None:
+            pyramiding = {".default": "mean"}
 
         image_export = ee.batch.Export.image.toAsset(
             image,
@@ -396,9 +411,11 @@ class EETask(GeoTask):
             scale=self.scale,
             crs=self.crs,
             maxPixels=self.ee_max_pixels,
+            pyramidingPolicy=pyramiding,
         )
         image_export.start()
         self.ee_tasks[image_export.id] = {}
+        return image_export.id
 
     def export_fc_ee(self, featurecollection, asset_path):
         featurecollection = self.set_export_metadata(
@@ -412,6 +429,7 @@ class EETask(GeoTask):
         )
         fc_export.start()
         self.ee_tasks[fc_export.id] = {}
+        return fc_export.id
 
     def export_fc_cloudstorage(
         self, featurecollection, bucket, asset_path, file_format="GeoJSON"
@@ -430,6 +448,7 @@ class EETask(GeoTask):
         )
         fc_export.start()
         self.ee_tasks[fc_export.id] = {}
+        return fc_export.id
 
     def wait(self):
         super().wait()

@@ -19,22 +19,25 @@ and configure an automated build using the `:latest` tag of the new git repo.
 
 ## Running locally
 To run locally, copy into your root either:  
-a) a `.config` dir containing your Earth Engine credentials file, or  
-b) a .env file  containing stringified GCP service account authentication details
+a) [recommended] a .env file  containing stringified GCP service account authentication details, or   
+b) a `.config` dir containing your Earth Engine credentials file
 
-Example commands below use `task_hii_popdens` as an example inheriting from this repo.
+Example commands below use `task_hii_popdens` as an example inheriting from this repo.   
+Include the `-v $PWD/.git:/app/.git` argument to write the SHA of the git commit 
+used to produce EE assets to their properties. 
 - To build docker image:  
 `docker build --pull --no-cache -t scl3/task_hii_popdens .`
 - To run with your personal ee credentials stored in a .config dir that you've copied from your user dir:  
-`docker run -it -v $PWD/.config:/root/.config scl3/task_hii_popdens python task/hii_popdens.py`
+`docker run -it -v $PWD/.config:/root/.config -v $PWD/.git:/app/.git scl3/task_hii_popdens python task/hii_popdens.py`
 - To run with GCP service account credentials:  
-`docker run -it --env-file ./.env scl3/task_hii_popdens python task/hii_popdens.py`
-- To additionally map host code dir to container app dir for development, running `python task/hii_popdens.py` within
+`docker run -it --env-file ./.env -v $PWD/.git:/app/.git scl3/task_hii_popdens python /app/hii_popdens.py`
+- To additionally map host code dir to container app dir for development, running `python /app/hii_popdens.py` within
  container  
-`docker run -it --env-file ./.env -v $PWD/src:/app scl3/task_hii_popdens sh`
+`docker run -it --env-file ./.env -v $PWD/src:/app -v $PWD/.git:/app/.git scl3/task_hii_popdens sh`
 
 ## Classes
 - `Task`: base class defining `taskdate` and other key properties - use for basic pipeline tasks not involving Earth
  Engine
 - `EETask`: base Earth Engine task - sufficient for all non-species-specific EE tasks
+- `HIITask`: use for Human Footprint-specific EE tasks
 - `SCLTask`: use for species-specific EE tasks
