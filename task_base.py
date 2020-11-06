@@ -491,7 +491,6 @@ class EETask(GeoTask):
                 if ee_task_state in self.EEFINISHED:
                     if ee_task_state == self.FAILED:
                         self._failed_ee_tasks[ee_task_id] = s
-`
                     del self.ee_tasks[ee_task_id]
                     # TODO: log and update self.status based on EECOMPLETED, EEFAILED, EECANCELLED, EEUNKNOWN
                 else:
