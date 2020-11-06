@@ -8,6 +8,14 @@ import git
 
 PROJECTS = "projects"
 
+class EETaskError(Exception):
+    def __init__(self, ee_statuses, *args, **kwargs):
+        self.ee_statuses = ee_statuses or dict()
+
+    def __str__(self):
+        num_failed_tasks = len(list(self.ee_statuses.keys()))
+        return f"Failed Earth Engine tasks: {num_failed_tasks}"
+
 
 class Task(object):
     DATE_FORMAT = "%Y-%m-%d"
@@ -109,6 +117,7 @@ class EETask(GeoTask):
     ee_project = None
     ee_rootdir = None
     ee_tasks = {}
+    _failed_ee_tasks = {}
     ee_max_pixels = 500000000000
 
     EEREADY = "READY"
@@ -452,8 +461,10 @@ class EETask(GeoTask):
 
     def wait(self):
         super().wait()
+
         max_sleep = 600
         counter = 3
+        self._failed_ee_tasks = dict()
         while self.ee_tasks:
             self.update_ee_tasks()
             if not self.ee_tasks:
@@ -464,14 +475,22 @@ class EETask(GeoTask):
                 sleeptime = max_sleep
             time.sleep(sleeptime)
 
+        if bool(self._failed_ee_tasks) is True:
+            raise EETaskError(ee_statuses=self._failed_ee_tasks)
+
     def update_ee_tasks(self):
         if self.ee_tasks:
             # possible ee task states: READY, RUNNING, COMPLETED, FAILED, CANCELLED, UNKNOWN
             statuses = ee.data.getTaskStatus(self.ee_tasks.keys())
             print(statuses)
             for s in statuses:
-                if s["state"] in self.EEFINISHED:
-                    del self.ee_tasks[s["id"]]
+                ee_task_state = s["state"]
+                ee_task_id = s["id"]
+
+                if ee_task_state in self.EEFINISHED:
+                    if ee_task_state == self.EEFAILED:
+                        self._failed_ee_tasks[ee_task_id] = s
+                    del self.ee_tasks[ee_task_id]
                     # TODO: log and update self.status based on EECOMPLETED, EEFAILED, EECANCELLED, EEUNKNOWN
                 else:
                     self.ee_tasks[s["id"]] = s
