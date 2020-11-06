@@ -477,7 +477,7 @@ class EETask(GeoTask):
 
         if bool(self._failed_ee_tasks) is True:
             raise EETaskError(ee_messages=self._failed_ee_tasks)
-
+            raise EETaskError(ee_statuses=self._failed_ee_tasks)
 
     def update_ee_tasks(self):
         if self.ee_tasks:
@@ -489,7 +489,7 @@ class EETask(GeoTask):
                 ee_task_id = s["id"]
 
                 if ee_task_state in self.EEFINISHED:
-                    if ee_task_state == self.FAILED:
+                    if ee_task_state == self.EEFAILED:
                         self._failed_ee_tasks[ee_task_id] = s
                     del self.ee_tasks[ee_task_id]
                     # TODO: log and update self.status based on EECOMPLETED, EEFAILED, EECANCELLED, EEUNKNOWN
