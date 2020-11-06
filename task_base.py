@@ -476,7 +476,6 @@ class EETask(GeoTask):
             time.sleep(sleeptime)
 
         if bool(self._failed_ee_tasks) is True:
-            raise EETaskError(ee_messages=self._failed_ee_tasks)
             raise EETaskError(ee_statuses=self._failed_ee_tasks)
 
     def update_ee_tasks(self):
