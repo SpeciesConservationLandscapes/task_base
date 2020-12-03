@@ -316,11 +316,13 @@ class EETask(GeoTask):
             ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
             asset = None
             asset_date = None
-            if "static" in ee_input and ee_input["static"] is True:
+            # no abstract featureCollection maxage checking; implement in inheritor specific to input
+            if ("static" in ee_input and ee_input["static"] is True) or ee_input[
+                "ee_type"
+            ] == self.FEATURECOLLECTION:
                 asset_date = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
                 continue
             else:
-                # no abstract featureCollection maxage checking; implement in inheritor specific to input
                 if ee_input["ee_type"] == self.IMAGE:
                     asset = ee.Image(ee_input["ee_path"])
                     system_timestamp = asset.get(
@@ -332,7 +334,7 @@ class EETask(GeoTask):
                     ic = ee.ImageCollection(ee_input["ee_path"])
                     asset, asset_date = self.get_most_recent_image(ic)
 
-            if asset.getInfo() is None or asset_date is None:
+            if asset is None or asset.getInfo() is None or asset_date is None:
                 self.status = self.FAILED
                 print(
                     f"Asset {ee_input['ee_path']} has no `{self.ASSET_TIMESTAMP_PROPERTY}` property, "
