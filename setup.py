@@ -3,7 +3,7 @@ from setuptools import setup
 setup(
     name="scl-task_base",
     description="Base python classes for creating HII and SCL tasks",
-    version="0.71",
+    version="0.72",
     py_modules=["task_base"],
     install_requires=["earthengine-api"],
 )
