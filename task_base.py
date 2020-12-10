@@ -443,7 +443,7 @@ class EETask(GeoTask):
         return fc_export.id
 
     def export_fc_cloudstorage(
-        self, featurecollection, bucket, asset_path, file_format="GeoJSON"
+        self, featurecollection, bucket, asset_path, file_format="GeoJSON", selectors=None
     ):
         featurecollection = self.set_export_metadata(
             featurecollection, ee_type=self.FEATURECOLLECTION
@@ -456,6 +456,7 @@ class EETask(GeoTask):
             bucket=bucket,
             fileNamePrefix=asset_path,
             fileFormat=file_format,
+            selectors=selectors,
         )
         fc_export.start()
         self.ee_tasks[fc_export.id] = {}
