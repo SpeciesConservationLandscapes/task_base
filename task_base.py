@@ -1,12 +1,14 @@
 import os
-import re
 import json
+import re
+import subprocess
 import time
 from datetime import datetime, timezone, timedelta
 import ee
 import git
 
 PROJECTS = "projects"
+
 
 class EETaskError(Exception):
     def __init__(self, ee_statuses, *args, **kwargs):
@@ -201,23 +203,30 @@ class EETask(GeoTask):
 
         super().__init__(*args, **kwargs)
 
-    # def rm(self, asset_path):
-    #     asset = ee.data.getInfo(asset_path)
-    #     if not asset:
-    #         return
-    #
-    #     if (
-    #         asset["type"].capitalize() == ee.data.ASSET_TYPE_FOLDER
-    #         or asset["type"].capitalize() == ee.data.ASSET_TYPE_IMAGE_COLL
-    #     ):
-    #         print(asset["type"].capitalize(), ee.data.ASSET_TYPE_FOLDER)
-    #         for child_asset in self._list_assets(asset_path):
-    #             self.rm(f"{asset_path}/{child_asset}")
-    #     print(asset)
-    #
-    #     ee.data.deleteAsset(asset_path)
-    #     return True
-    #
+    def rm_ee(self, asset_path, dry_run=False):
+        asset_path = f"{self.ee_rootdir}/{asset_path}"
+        asset = ee.data.getInfo(asset_path)
+        if not asset:
+            print(f"{asset_path} does not exist")
+            return False
+
+        asset_type = asset["type"].capitalize()
+        cmd_args = ["earthengine", "rm"]
+        if dry_run:
+            cmd_args.append("--dry_run")
+
+        if (
+            asset_type == ee.data.ASSET_TYPE_FOLDER
+            or asset_type == ee.data.ASSET_TYPE_IMAGE_COLL
+            or asset_type == ee.data.ASSET_TYPE_FOLDER_CLOUD
+            or asset_type == ee.data.ASSET_TYPE_IMAGE_COLL_CLOUD
+        ):
+            cmd_args.append("-r")
+        cmd_args.append(asset_path)
+
+        subprocess.run(cmd_args)
+        return True
+
     # def cp(self, source_id, destination_id, overwrite=True):
     #     destination_dir = "/".join(destination_id.split("/")[:-1])
     #     if not ee.data.getInfo(source_id) or not ee.data.getInfo(destination_dir):
@@ -444,7 +453,12 @@ class EETask(GeoTask):
         return fc_export.id
 
     def export_fc_cloudstorage(
-        self, featurecollection, bucket, asset_path, file_format="GeoJSON", selectors=None
+        self,
+        featurecollection,
+        bucket,
+        asset_path,
+        file_format="GeoJSON",
+        selectors=None,
     ):
         featurecollection = self.set_export_metadata(
             featurecollection, ee_type=self.FEATURECOLLECTION
