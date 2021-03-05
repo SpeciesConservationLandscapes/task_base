@@ -131,10 +131,11 @@ class EETask(GeoTask):
     EEUNKNOWN = "UNKNOWN"
     EEFINISHED = [EECOMPLETED, EESUCCEEDED, EEFAILED, EECANCELLED, EEUNKNOWN]
 
-    IMAGECOLLECTION = ee.data.ASSET_TYPE_IMAGE_COLL
-    FEATURECOLLECTION = "FeatureCollection"
+    IMAGECOLLECTION = "ImageCollection"
     IMAGE = "Image"
-    EEDATATYPES = [IMAGECOLLECTION, FEATURECOLLECTION, IMAGE]
+    EEDIR = "Folder"
+    FEATURECOLLECTION = "FeatureCollection"
+    EEDATATYPES = [IMAGECOLLECTION, IMAGE, EEDIR, FEATURECOLLECTION]
 
     def _canonicalize_assetid(self, assetid):
         path_segments = [s.replace(" ", "_") for s in assetid.split("/")]
@@ -329,7 +330,7 @@ class EETask(GeoTask):
             # no abstract featureCollection maxage checking; implement in inheritor specific to input
             if ("static" in ee_input and ee_input["static"] is True) or ee_input[
                 "ee_type"
-            ] == self.FEATURECOLLECTION:
+            ] == self.FEATURECOLLECTION or ee_input["ee_type"] == self.EEDIR:
                 asset_date = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
                 continue
             else:
@@ -530,7 +531,7 @@ class SCLTask(EETask):
     def _scl_path(self, scltype):
         if scltype is None or scltype not in self.LANDSCAPE_TYPES:
             raise TypeError("Missing or incorrect scltype for setting scl path")
-        return self.get_most_recent_featurecollection(f"{self.ee_rootdir}/pothab/scl_{scltype}")[0]
+        return f"{self.ee_rootdir}/pothab/scl_{scltype}"
 
     def scl_path_species(self):
         return self._scl_path(self.SPECIES)
