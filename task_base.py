@@ -530,7 +530,7 @@ class SCLTask(EETask):
     def _scl_path(self, scltype):
         if scltype is None or scltype not in self.LANDSCAPE_TYPES:
             raise TypeError("Missing or incorrect scltype for setting scl path")
-        return f"{self.ee_rootdir}/pothab/scl_{scltype}"
+        return self.get_most_recent_featurecollection(f"{self.ee_rootdir}/pothab/scl_{scltype}")[0]
 
     def scl_path_species(self):
         return self._scl_path(self.SPECIES)

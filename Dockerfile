@@ -18,5 +18,8 @@ RUN set -ex \
         git \
         less \
         nano \
-    && pip install earthengine-api \
-    && pip install gitpython
+    && pip install earthengine-api==0.1.254 \
+    && pip install gitpython==3.1.14 \
+    && pip install google-api-python-client==1.12.5
+
+WORKDIR /app
