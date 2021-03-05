@@ -296,7 +296,9 @@ class EETask(GeoTask):
                         most_recent_fc = ee.FeatureCollection(asset["id"])
                         most_recent_date = fcdate
 
-        return most_recent_fc, ee.Date(most_recent_date.strftime(self.DATE_FORMAT))
+        if most_recent_date is not None:
+            most_recent_date = ee.Date(most_recent_date.strftime(self.DATE_FORMAT)
+        return most_recent_fc, most_recent_date)
 
     def check_inputs(self):
         super().check_inputs()
