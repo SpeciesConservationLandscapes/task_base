@@ -268,14 +268,16 @@ class EETask(GeoTask):
             .sort(self.ASSET_TIMESTAMP_PROPERTY, False)
             .first()
         )
+        return_image = None
         most_recent_date = None
         if most_recent_image.getInfo():
+            return_image = most_recent_image
             system_timestamp = most_recent_image.get(
                 self.ASSET_TIMESTAMP_PROPERTY
             ).getInfo()
             if system_timestamp:
                 most_recent_date = ee.Date(system_timestamp)
-        return most_recent_image, most_recent_date
+        return return_image, most_recent_date
 
     # only use on fcs with SCL naming convention ending in `YYYY-mm-dd`
     def get_most_recent_featurecollection(self, eedir):
