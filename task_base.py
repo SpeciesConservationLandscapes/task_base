@@ -43,10 +43,9 @@ class Task(object):
 
     def __init__(self, *args, **kwargs):
         _taskdate = datetime.now(timezone.utc).date()
+        _taskdatestr = kwargs.get("taskdate") or os.environ.get("taskdate")
         try:
-            _taskdate = datetime.strptime(
-                kwargs.pop("taskdate", None), self.DATE_FORMAT
-            ).date()
+            _taskdate = datetime.strptime(_taskdatestr, self.DATE_FORMAT).date()
         except (TypeError, ValueError):
             pass
         self.taskdate = _taskdate
@@ -332,9 +331,11 @@ class EETask(GeoTask):
             asset = None
             asset_date = None
             # no abstract featureCollection maxage checking; implement in inheritor specific to input
-            if ("static" in ee_input and ee_input["static"] is True) or ee_input[
-                "ee_type"
-            ] == self.FEATURECOLLECTION or ee_input["ee_type"] == self.EEDIR:
+            if (
+                ("static" in ee_input and ee_input["static"] is True)
+                or ee_input["ee_type"] == self.FEATURECOLLECTION
+                or ee_input["ee_type"] == self.EEDIR
+            ):
                 asset_date = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
                 continue
             else:
@@ -503,20 +504,22 @@ class EETask(GeoTask):
 
     def update_ee_tasks(self):
         if self.ee_tasks:
-            # possible ee task states: READY, RUNNING, COMPLETED, FAILED, CANCELLED, UNKNOWN
-            statuses = ee.data.getTaskStatus(self.ee_tasks.keys())
-            print(statuses)
-            for s in statuses:
-                ee_task_state = s["state"]
-                ee_task_id = s["id"]
+            try:
+                # possible ee task states: READY, RUNNING, COMPLETED, FAILED, CANCELLED, UNKNOWN
+                statuses = ee.data.getTaskStatus(self.ee_tasks.keys())
+                print(statuses)
+                for s in statuses:
+                    ee_task_state = s["state"]
+                    ee_task_id = s["id"]
 
-                if ee_task_state in self.EEFINISHED:
-                    if ee_task_state == self.EEFAILED:
-                        self._failed_ee_tasks[ee_task_id] = s
-                    del self.ee_tasks[ee_task_id]
-                    # TODO: log and update self.status based on EECOMPLETED, EEFAILED, EECANCELLED, EEUNKNOWN
-                else:
-                    self.ee_tasks[s["id"]] = s
+                    if ee_task_state in self.EEFINISHED:
+                        if ee_task_state == self.EEFAILED:
+                            self._failed_ee_tasks[ee_task_id] = s
+                        del self.ee_tasks[ee_task_id]
+                    else:
+                        self.ee_tasks[s["id"]] = s
+            except ConnectionResetError:
+                pass  # assume intermittent connectivity issue
 
 
 class SCLTask(EETask):
@@ -550,13 +553,15 @@ class SCLTask(EETask):
         return self._scl_path(self.FRAGMENT)
 
     def __init__(self, *args, **kwargs):
-        self.species = kwargs.pop("species", None)
+        self.species = kwargs.get("species") or os.environ.get("species")
         if not self.species:
             # remove this line when we move beyond tigers
             self.species = "Panthera_tigris"
             # raise NotImplementedError('`species` must be defined')
 
-        self.scenario = kwargs.pop("scenario", self.CANONICAL)
+        self.scenario = (
+            kwargs.get("scenario") or os.environ.get("scenario") or self.CANONICAL
+        )
 
         ee_rootdir = f"{PROJECTS}/{self.ee_project}/{self.species}/{self.scenario}"
         path_segments = [s.replace(" ", "_") for s in ee_rootdir.split("/")]
