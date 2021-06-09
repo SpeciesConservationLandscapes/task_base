@@ -3,9 +3,10 @@ import json
 import re
 import subprocess
 import time
-from datetime import datetime, timezone, timedelta
 import ee
 import git
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
 
 PROJECTS = "projects"
 
@@ -30,7 +31,6 @@ class Task(object):
     COMPLETE = "complete"
     status = NOTSTARTED
     inputs = {}
-    wait_for_outputs = True
 
     def _set_inputs(self):
         for input_key, i in self.inputs.items():
@@ -50,7 +50,7 @@ class Task(object):
             pass
         self.taskdate = _taskdate
 
-        self.wait_for_outputs = kwargs.pop("wait_for_outputs", True)
+        self.overwrite = kwargs.get("overwrite") or os.environ.get("overwrite") or False
 
         self._set_inputs()
 
@@ -115,6 +115,7 @@ class GeoTask(Task):
 
 class EETask(GeoTask):
     service_account_key = os.environ.get("SERVICE_ACCOUNT_KEY")
+    google_creds_path = "/.google_creds"
     ee_project = None
     ee_rootdir = None
     ee_tasks = {}
@@ -139,13 +140,16 @@ class EETask(GeoTask):
     def _canonicalize_assetid(self, assetid):
         path_segments = [s.replace(" ", "_") for s in assetid.split("/")]
         assetid = "/".join(path_segments)
-        if not ee.data.getInfo(assetid):
-            return assetid
-        i = 1
-        new_assetid = "{}-{}".format(assetid, i)
-        while ee.data.getInfo(new_assetid):
-            i += 1
-            new_assetid = "{}-{}".format(assetid, i)
+        new_assetid = assetid
+        if ee.data.getInfo(assetid):
+            i = 1
+            while ee.data.getInfo(new_assetid):
+                new_assetid = f"{assetid}-{i}"
+                i += 1
+
+        if self.overwrite and assetid != new_assetid:
+            self.transaction_assets.append((assetid, new_assetid))
+
         return new_assetid
 
     def _prep_asset_id(self, asset_path, image_collection=False):
@@ -189,6 +193,54 @@ class EETask(GeoTask):
             print(f"Folder {eedir} does not exist or is not a folder.")
         return assets
 
+    def _rm_ee(self, asset_id, dry_run=False):
+        asset = ee.data.getInfo(asset_id)
+        if not asset:
+            print(f"{asset_id} does not exist")
+            return False
+
+        asset_type = asset["type"].capitalize()
+        cmd_args = [
+            "earthengine",
+            f"--service_account_file {self.google_creds_path}",
+            "rm",
+        ]
+        if dry_run:
+            cmd_args.append("--dry_run")
+
+        if (
+            asset_type == ee.data.ASSET_TYPE_FOLDER
+            or asset_type == ee.data.ASSET_TYPE_IMAGE_COLL
+            or asset_type == ee.data.ASSET_TYPE_FOLDER_CLOUD
+            or asset_type == ee.data.ASSET_TYPE_IMAGE_COLL_CLOUD
+        ):
+            cmd_args.append("-r")
+        cmd_args.append(asset_id)
+
+        subprocess.run(" ".join(cmd_args), stderr=subprocess.STDOUT, shell=True)
+        return True
+
+    def _mv_ee(self, old_assetid, new_assetid):
+        old_asset = ee.data.getInfo(old_assetid)
+        if not old_asset:
+            print(f"{old_assetid} does not exist")
+            return False
+        new_asset = ee.data.getInfo(new_assetid)
+        if new_asset:
+            print(f"{new_assetid} already exists")
+            return False
+
+        cmd_args = [
+            "earthengine",
+            f"--service_account_file {self.google_creds_path}",
+            "mv",
+            old_assetid,
+            new_assetid,
+        ]
+        subprocess.run(" ".join(cmd_args), stderr=subprocess.STDOUT, shell=True)
+
+        return True
+
     def __init__(self, *args, **kwargs):
         self._initialize_ee_client()
 
@@ -201,31 +253,24 @@ class EETask(GeoTask):
             self.ee_rootdir = f"{PROJECTS}/{self.ee_project}"
         self.ee_rootdir = self.ee_rootdir.strip("/")
 
+        self.transaction_assets = []
+
+        creds_path = Path(self.google_creds_path)
+        if creds_path.exists() is False:
+            with open(creds_path, "w") as f:
+                f.write(self.service_account_key)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.google_creds_path
+
         super().__init__(*args, **kwargs)
 
     def rm_ee(self, asset_path, dry_run=False):
         asset_path = f"{self.ee_rootdir}/{asset_path}"
-        asset = ee.data.getInfo(asset_path)
-        if not asset:
-            print(f"{asset_path} does not exist")
-            return False
+        return self._rm_ee(asset_path, dry_run)
 
-        asset_type = asset["type"].capitalize()
-        cmd_args = ["earthengine", "rm"]
-        if dry_run:
-            cmd_args.append("--dry_run")
-
-        if (
-            asset_type == ee.data.ASSET_TYPE_FOLDER
-            or asset_type == ee.data.ASSET_TYPE_IMAGE_COLL
-            or asset_type == ee.data.ASSET_TYPE_FOLDER_CLOUD
-            or asset_type == ee.data.ASSET_TYPE_IMAGE_COLL_CLOUD
-        ):
-            cmd_args.append("-r")
-        cmd_args.append(asset_path)
-
-        subprocess.run(cmd_args)
-        return True
+    def mv_ee(self, old_asset_path, new_asset_path):
+        old_asset_path = f"{self.ee_rootdir}/{old_asset_path}"
+        new_asset_path = f"{self.ee_rootdir}/{new_asset_path}"
+        return self._mv_ee(old_asset_path, new_asset_path)
 
     # def cp(self, source_id, destination_id, overwrite=True):
     #     destination_dir = "/".join(destination_id.split("/")[:-1])
@@ -520,6 +565,12 @@ class EETask(GeoTask):
                         self.ee_tasks[s["id"]] = s
             except ConnectionResetError:
                 pass  # assume intermittent connectivity issue
+
+    def clean_up(self, **kwargs):
+        if self.status != self.FAILED and self.overwrite:
+            for old_assetid, new_assetid in self.transaction_assets:
+                self._rm_ee(old_assetid)
+                self._mv_ee(new_assetid, old_assetid)
 
 
 class SCLTask(EETask):
