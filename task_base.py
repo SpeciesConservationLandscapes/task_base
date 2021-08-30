@@ -5,7 +5,7 @@ import subprocess
 import time
 import ee
 import git
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from pathlib import Path
 
 PROJECTS = "projects"
@@ -323,6 +323,29 @@ class EETask(GeoTask):
                 most_recent_date = ee.Date(system_timestamp)
         return return_image, most_recent_date
 
+    def get_most_recent_fullyear_imagecollection(
+        self, imagecollection, maxage, filterdate=None, iteration=1
+    ):
+        filterdate = filterdate or self.taskdate + timedelta(days=1)
+        previousyear_start = date(filterdate.year - 1, 1, 1)
+        previousyear_end = date(filterdate.year - 1, 12, 31)
+        most_recent_ic = imagecollection.filterDate(
+            previousyear_start.strftime(self.DATE_FORMAT),
+            previousyear_end.strftime(self.DATE_FORMAT),
+        )
+        images = most_recent_ic.getInfo()["features"]
+        if len(images) > 0:
+            return most_recent_ic, ee.Date(
+                previousyear_start.strftime(self.DATE_FORMAT)
+            )
+
+        if iteration < maxage:
+            return self.get_most_recent_fullyear_imagecollection(
+                imagecollection, maxage, previousyear_start, iteration + 1
+            )
+
+        return None, None
+
     # only use on fcs with SCL naming convention ending in `YYYY-mm-dd`
     def get_most_recent_featurecollection(self, eedir):
         most_recent_fc = None
@@ -625,3 +648,29 @@ class SCLTask(EETask):
 
 class HIITask(EETask):
     ee_project = "HII/v1"
+    common_inputs = {
+        "worldpop": {
+            "ee_type": EETask.IMAGECOLLECTION,
+            "ee_path": "WorldPop/GP/100m/pop",
+            "maxage": 2,
+        },
+    }
+
+    @property
+    def population_density(self):
+        worldpop_ic, worldpop_date = self.get_most_recent_fullyear_imagecollection(
+            ee.ImageCollection(self.common_inputs["worldpop"]["ee_path"]),
+            self.common_inputs["worldpop"]["maxage"],
+        )
+        worldpop_scale = worldpop_ic.first().projection().nominalScale()
+        area_km2 = (
+            ee.Image.pixelArea()
+            .multiply(0.000001)
+            .reproject("EPSG:4326", None, worldpop_scale)
+        )
+
+        return (
+            worldpop_ic.mosaic()
+            .divide(area_km2)
+            .setDefaultProjection("EPSG:4326", None, worldpop_scale)
+        )
