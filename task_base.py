@@ -647,6 +647,7 @@ class SCLTask(EETask):
 
 
 class HIITask(EETask):
+    scale = 300
     ee_project = "HII/v1"
     common_inputs = {
         "worldpop": {
@@ -662,15 +663,25 @@ class HIITask(EETask):
             ee.ImageCollection(self.common_inputs["worldpop"]["ee_path"]),
             self.common_inputs["worldpop"]["maxage"],
         )
-        worldpop_scale = worldpop_ic.first().projection().nominalScale()
-        area_km2 = (
-            ee.Image.pixelArea()
-            .multiply(0.000001)
-            .reproject("EPSG:4326", None, worldpop_scale)
-        )
 
-        return (
-            worldpop_ic.mosaic()
-            .divide(area_km2)
-            .setDefaultProjection("EPSG:4326", None, worldpop_scale)
-        )
+        if worldpop_ic:
+            worldpop_scale = worldpop_ic.first().projection().nominalScale()
+            area_km2 = (
+                ee.Image.pixelArea()
+                .multiply(0.000001)
+                .reproject("EPSG:4326", None, worldpop_scale)
+            )
+
+            return (
+                worldpop_ic.mosaic()
+                .divide(area_km2)
+                .setDefaultProjection("EPSG:4326", None, worldpop_scale)
+            )
+
+        return None
+
+    def check_inputs(self):
+        super().check_inputs()
+        if self.population_density is None:
+            self.status = self.FAILED
+            print(f"Could not get population density for {self.taskdate}")

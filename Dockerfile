@@ -1,24 +1,16 @@
-FROM python:3.8.5-alpine3.12
+FROM python:3.9.6-slim-buster
 LABEL maintainer="saanobhaai"
 
-ENV LANGUAGE en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LC_ALL en_US.UTF-8
-ENV LC_CTYPE en_US.UTF-8
-ENV LC_MESSAGES en_US.UTF-8
+ENV DEBIAN_FRONTEND noninteractive
+ENV LANG C.UTF-8
+ENV LANGUAGE C.UTF-8
+ENV LC_ALL C.UTF-8
 
-RUN set -ex \
-    && apk update -q \
-    && apk upgrade -q \
-    && apk add -q \
-        build-base \
-        libressl-dev \
-        musl-dev \
-        libffi-dev \
-        git \
-        less \
-        nano \
-    && pip install earthengine-api==0.1.254 \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git less nano
+
+RUN pip install --upgrade pip setuptools wheel
+RUN pip install earthengine-api==0.1.254 \
     && pip install gitpython==3.1.14 \
     && pip install google-api-python-client==1.12.5
 
