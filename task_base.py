@@ -607,7 +607,7 @@ class SCLTask(EETask):
     ee_project = "SCL/v1"
     species = None
     scenario = None
-    ee_aoi = "historical_range_img_200914"
+    ee_aoi = "historical_range"
 
     def _scl_path(self, scltype):
         if scltype is None or scltype not in self.LANDSCAPE_TYPES:
