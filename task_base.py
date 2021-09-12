@@ -637,12 +637,13 @@ class SCLTask(EETask):
             kwargs.get("scenario") or os.environ.get("scenario") or self.CANONICAL
         )
 
-        ee_rootdir = f"{PROJECTS}/{self.ee_project}/{self.species}/{self.scenario}"
+        self.speciesdir = f"{PROJECTS}/{self.ee_project}/{self.species}"
+        ee_rootdir = f"{self.speciesdir}/{self.scenario}"
         path_segments = [s.replace(" ", "_") for s in ee_rootdir.split("/")]
         ee_rootdir = "/".join(path_segments)
         super().__init__(*args, ee_rootdir=ee_rootdir, **kwargs)
         self.set_aoi_from_ee(
-            f"{PROJECTS}/{self.ee_project}/{self.species}/{self.ee_aoi}"
+            f"{self.speciesdir}/{self.ee_aoi}"
         )
 
 
