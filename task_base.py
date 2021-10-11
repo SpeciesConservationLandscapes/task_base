@@ -120,7 +120,7 @@ class EETask(GeoTask):
     ee_rootdir = None
     ee_tasks = {}
     _failed_ee_tasks = {}
-    ee_max_pixels = 500000000000
+    ee_max_pixels = 10000000000000
 
     EEREADY = "READY"
     EE = "RUNNING"
