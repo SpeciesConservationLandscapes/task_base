@@ -77,7 +77,7 @@ class Task(object):
                     self.status = self.COMPLETE
                 except Exception as e:
                     self.status = self.FAILED
-                    raise type(e)(str(e)) from e
+                    raise e
         finally:
             self.clean_up()
         print("status: {}".format(self.status))
