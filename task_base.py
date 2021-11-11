@@ -51,6 +51,7 @@ class Task(object):
         self.taskdate = _taskdate
 
         self.overwrite = kwargs.get("overwrite") or os.environ.get("overwrite") or False
+        self.raiseonfail = kwargs.get("raiseonfail") or os.environ.get("raiseonfail") or True
 
         self._set_inputs()
 
@@ -77,7 +78,8 @@ class Task(object):
                     self.status = self.COMPLETE
                 except Exception as e:
                     self.status = self.FAILED
-                    raise e
+                    if self.raiseonfail:
+                        raise e
         finally:
             self.clean_up()
         print("status: {}".format(self.status))
