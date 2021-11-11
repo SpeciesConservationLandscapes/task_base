@@ -512,6 +512,30 @@ class EETask(GeoTask):
         self.ee_tasks[image_export.id] = {}
         return image_export.id
 
+    def export_image_cloudstorage(self, image, bucket, asset_path, region=None):
+        image = self.set_export_metadata(image)
+        blob = asset_path.split("/")[-1]
+        if region is None:
+            region = self.extent
+        if isinstance(region, list):
+            region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
+
+        image_export = ee.batch.Export.image.toCloudStorage(
+            image=image,
+            description=blob,
+            bucket=bucket,
+            fileNamePrefix=asset_path,
+            region=region,
+            fileFormat="GeoTIFF",
+            formatOptions={"cloudOptimized": True},
+            scale=self.scale,
+            crs=self.crs,
+            maxPixels=self.ee_max_pixels,
+        )
+        image_export.start()
+        self.ee_tasks[image_export.id] = {}
+        return image_export.id
+
     def export_fc_ee(self, featurecollection, asset_path):
         featurecollection = self.set_export_metadata(
             featurecollection, ee_type=self.FEATURECOLLECTION
