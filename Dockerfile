@@ -7,7 +7,7 @@ ENV LANGUAGE C.UTF-8
 ENV LC_ALL C.UTF-8
 
 RUN apt-get update
-RUN apt-get install -y git less nano
+RUN apt-get install -y --no-install-recommends git less nano
 
 RUN /usr/local/bin/python -m pip install --upgrade pip
 RUN /usr/local/bin/python -m pip install --no-cache-dir \
