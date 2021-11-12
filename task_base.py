@@ -51,6 +51,7 @@ class Task(object):
         self.taskdate = _taskdate
 
         self.overwrite = kwargs.get("overwrite") or os.environ.get("overwrite") or False
+        self.raiseonfail = kwargs.get("raiseonfail") or os.environ.get("raiseonfail") or True
 
         self._set_inputs()
 
@@ -77,7 +78,8 @@ class Task(object):
                     self.status = self.COMPLETE
                 except Exception as e:
                     self.status = self.FAILED
-                    raise e
+                    if self.raiseonfail:
+                        raise e
         finally:
             self.clean_up()
         print("status: {}".format(self.status))
@@ -493,7 +495,7 @@ class EETask(GeoTask):
         image_name, asset_id = self._prep_asset_id(asset_path, image_collection)
         if region is None:
             region = self.extent
-        if isinstance(region, list):
+        elif isinstance(region, list):
             region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
         if pyramiding is None:
             pyramiding = {".default": "mean"}
@@ -507,6 +509,30 @@ class EETask(GeoTask):
             crs=self.crs,
             maxPixels=self.ee_max_pixels,
             pyramidingPolicy=pyramiding,
+        )
+        image_export.start()
+        self.ee_tasks[image_export.id] = {}
+        return image_export.id
+
+    def export_image_cloudstorage(self, image, bucket, asset_path, region=None):
+        image = self.set_export_metadata(image)
+        blob = asset_path.split("/")[-1]
+        if region is None:
+            region = self.extent
+        elif isinstance(region, list):
+            region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
+
+        image_export = ee.batch.Export.image.toCloudStorage(
+            image=image,
+            description=blob,
+            bucket=bucket,
+            fileNamePrefix=asset_path,
+            region=region,
+            fileFormat="GeoTIFF",
+            formatOptions={"cloudOptimized": True},
+            scale=self.scale,
+            crs=self.crs,
+            maxPixels=self.ee_max_pixels,
         )
         image_export.start()
         self.ee_tasks[image_export.id] = {}
