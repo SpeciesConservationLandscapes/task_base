@@ -495,7 +495,7 @@ class EETask(GeoTask):
         image_name, asset_id = self._prep_asset_id(asset_path, image_collection)
         if region is None:
             region = self.extent
-        if isinstance(region, list):
+        elif isinstance(region, list):
             region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
         if pyramiding is None:
             pyramiding = {".default": "mean"}
@@ -519,7 +519,7 @@ class EETask(GeoTask):
         blob = asset_path.split("/")[-1]
         if region is None:
             region = self.extent
-        if isinstance(region, list):
+        elif isinstance(region, list):
             region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
 
         image_export = ee.batch.Export.image.toCloudStorage(
