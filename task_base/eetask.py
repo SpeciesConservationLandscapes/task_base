@@ -154,7 +154,6 @@ class EETask(GeoTask, DataTransferMixin):
 
     def __init__(self, *args, **kwargs):
         self._initialize_ee_client()
-        self.gcsclient = Client()
 
         if not self.ee_project:
             self.status = self.FAILED
@@ -172,6 +171,7 @@ class EETask(GeoTask, DataTransferMixin):
             with open(creds_path, "w") as f:
                 f.write(self.service_account_key)
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.google_creds_path
+        self.gcsclient = Client()
 
         super().__init__(*args, **kwargs)
 
