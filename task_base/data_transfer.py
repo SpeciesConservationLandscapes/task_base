@@ -26,25 +26,23 @@ class DataTransferMixin(object):
 
     def upload_to_cloudstorage(
         self,
-        src_path: Union[str, Path],
-        name: Optional[str] = None,
-        bucketname: Optional[str] = None,
+        local_path: Union[str, Path],
+        blob_path: Union[str, Path],
+        bucketname: Optional[str] = None
     ) -> str:
         bucketname = bucketname or self.DEFAULT_BUCKET
-        targ_name = name or Path(src_path).name
-        targ_path = Path(str(self.taskdate), targ_name)
         bucket = self.gcsclient.get_bucket(bucketname)
-        blob = bucket.blob(str(targ_path))
-        blob.upload_from_filename(str(src_path), timeout=3600)
-        return f"gs://{bucketname}/{targ_path}"
+        blob = bucket.blob(str(blob_path))
+        blob.upload_from_filename(str(local_path), timeout=3600)
+        return f"gs://{bucketname}/{blob_path}"
 
     def download_from_cloudstorage(
-        self, blob_path: str, local_path: str, bucketname: Optional[str] = None
+        self, blob_path: Union[str, Path], local_path: Union[str, Path], bucketname: Optional[str] = None
     ) -> str:
         bucketname = bucketname or self.DEFAULT_BUCKET
         bucket = self.gcsclient.get_bucket(bucketname)
-        blob = bucket.blob(blob_path)
-        blob.download_to_filename(local_path)
+        blob = bucket.blob(str(blob_path))
+        blob.download_to_filename(str(local_path))
         return local_path
 
     def remove_from_cloudstorage(
@@ -76,6 +74,7 @@ class DataTransferMixin(object):
             task_id = self._parse_task_id(output)
             if task_id is None:
                 raise TypeError("task_id is None")
+            self.ee_tasks[task_id] = {}
             return task_id
         except subprocess.CalledProcessError as err:
             raise ConversionException(err.stdout)
@@ -100,6 +99,7 @@ class DataTransferMixin(object):
             task_id = self._parse_task_id(output)
             if task_id is None:
                 raise TypeError("task_id is None")
+            self.ee_tasks[task_id] = {}
             return task_id
         except subprocess.CalledProcessError as err:
             raise ConversionException(err.stdout)
