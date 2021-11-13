@@ -61,13 +61,15 @@ class DataTransferMixin(object):
         self, blob_uri: str, image_asset_id: str, nodataval: Optional[int] = None
     ) -> str:
         try:
-            options = [
-                f"--service_account_file {self.google_creds_path}",
+            cmd_args = [
+                "/usr/local/bin/earthengine",
+                f"--service_account_file={self.google_creds_path}",
+                "upload image",
                 f"--asset_id={image_asset_id}",
             ]
             if nodataval:
-                options.append(f"--nodata_value={nodataval}")
-            cmd = ["/usr/local/bin/earthengine", "upload image"] + options + [blob_uri]
+                cmd_args.append(f"--nodata_value={nodataval}")
+            cmd = cmd_args + [blob_uri]
             output = subprocess.check_output(
                 " ".join(cmd), stderr=subprocess.STDOUT, shell=True
             )
@@ -82,14 +84,16 @@ class DataTransferMixin(object):
         self, blob_uri: str, table_asset_id: str, geometry_column: Optional[str] = None
     ) -> str:
         try:
-            options = [
-                f"--service_account_file {self.google_creds_path}",
+            cmd_args = [
+                "/usr/local/bin/earthengine",
+                f"--service_account_file={self.google_creds_path}",
+                "upload table",
                 f"--asset_id={table_asset_id}",
             ]
             if geometry_column:
-                options.append(f"--primary_geometry_column {geometry_column}")
+                cmd_args.append(f"--primary_geometry_column {geometry_column}")
 
-            cmd = ["/usr/local/bin/earthengine", "upload table"] + options + [blob_uri]
+            cmd = cmd_args + [blob_uri]
             output = subprocess.check_output(
                 " ".join(cmd), stderr=subprocess.STDOUT, shell=True
             )
