@@ -103,9 +103,8 @@ class DataTransferMixin(object):
     def image2storage(self, image, bucket, asset_path, region=None):
         image = self.set_export_metadata(image)
         blob = asset_path.split("/")[-1]
-        if region is None:
-            region = self.extent
-        elif isinstance(region, list):
+        region = region or self.extent
+        if isinstance(region, list):
             region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
 
         image_export = ee.batch.Export.image.toCloudStorage(
