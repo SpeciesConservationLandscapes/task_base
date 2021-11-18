@@ -5,8 +5,12 @@ import subprocess
 import time
 import ee
 import git
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta
+from google.cloud.storage import Client
 from pathlib import Path
+from .geotask import GeoTask
+from .data_transfer import DataTransferMixin
+
 
 PROJECTS = "projects"
 
@@ -20,102 +24,7 @@ class EETaskError(Exception):
         return f"Failed Earth Engine tasks: {num_failed_tasks}"
 
 
-class Task(object):
-    DATE_FORMAT = "%Y-%m-%d"
-    ASSET_TIMESTAMP_PROPERTY = "system:time_start"
-
-    # possible statuses associated with a Task instance -- which is different from ee task statuses
-    NOTSTARTED = "not started"
-    FAILED = "failed"
-    RUNNING = "running"
-    COMPLETE = "complete"
-    status = NOTSTARTED
-    inputs = {}
-
-    def _set_inputs(self):
-        for input_key, i in self.inputs.items():
-            for key, val in i.items():
-                if not isinstance(val, str) or not hasattr(self.__class__, val):
-                    continue
-                func = getattr(self.__class__, val)
-                if callable(func):
-                    self.inputs[input_key][key] = func(self)
-
-    def __init__(self, *args, **kwargs):
-        _taskdate = datetime.now(timezone.utc).date()
-        _taskdatestr = kwargs.get("taskdate") or os.environ.get("taskdate")
-        try:
-            _taskdate = datetime.strptime(_taskdatestr, self.DATE_FORMAT).date()
-        except (TypeError, ValueError):
-            pass
-        self.taskdate = _taskdate
-
-        self.overwrite = kwargs.get("overwrite") or os.environ.get("overwrite") or False
-        self.raiseonfail = kwargs.get("raiseonfail") or os.environ.get("raiseonfail") or True
-
-        self._set_inputs()
-
-    def check_inputs(self):
-        pass
-
-    def calc(self):
-        raise NotImplementedError("`calc` must be defined")
-
-    def wait(self):
-        pass
-
-    def clean_up(self, **kwargs):
-        pass
-
-    def run(self, **kwargs):
-        try:
-            self.status = self.RUNNING
-            self.check_inputs()
-            if self.status != self.FAILED:
-                try:
-                    self.calc()
-                    self.wait()
-                    self.status = self.COMPLETE
-                except Exception as e:
-                    self.status = self.FAILED
-                    if self.raiseonfail:
-                        raise e
-        finally:
-            self.clean_up()
-        print("status: {}".format(self.status))
-
-
-class GeoTask(Task):
-    crs = "EPSG:4326"
-    scale = 1000
-    aoi = [
-        [
-            [
-                [-180.0, -58.0],
-                [180.0, -58.0],
-                [180.0, 84.0],
-                [-180.0, 84.0],
-                [-180.0, -58.0],
-            ]
-        ]
-    ]
-    extent = aoi[0][0]
-
-    def check_inputs(self):
-        super().check_inputs()
-        if (
-            not hasattr(self, "aoi")
-            or not hasattr(self, "scale")
-            or not hasattr(self, "crs")
-            or not self.aoi
-            or not self.scale
-            or not self.crs
-        ):
-            self.status = self.FAILED
-            raise NotImplementedError("Undefined input: aoi, scale, or crs")
-
-
-class EETask(GeoTask):
+class EETask(GeoTask, DataTransferMixin):
     service_account_key = os.environ.get("SERVICE_ACCOUNT_KEY")
     google_creds_path = "/.google_creds"
     ee_project = None
@@ -188,7 +97,7 @@ class EETask(GeoTask):
     def _list_assets(self, eedir):
         assets = None
         # possible ee api bug requires prepending
-        assetdir = f"projects/earthengine-legacy/assets/{eedir}"
+        assetdir = f"{PROJECTS}/earthengine-legacy/assets/{eedir}"
         try:
             assets = ee.data.listAssets({"parent": assetdir})["assets"]
         except ee.ee_exception.EEException:
@@ -262,6 +171,7 @@ class EETask(GeoTask):
             with open(creds_path, "w") as f:
                 f.write(self.service_account_key)
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.google_creds_path
+        self.gcsclient = Client()
 
         super().__init__(*args, **kwargs)
 
@@ -442,6 +352,26 @@ class EETask(GeoTask):
                     )
                     continue
 
+    def inner_join(self, primary, secondary, primary_field, secondary_field):
+        def _flatten_fields(feat):
+            primary_feature = ee.Feature(feat.get("primary"))
+            secondary_feature = ee.Feature(feat.get("secondary"))
+            return_feat = ee.Feature(
+                primary_feature.geometry(),
+                primary_feature.toDictionary().combine(
+                    secondary_feature.toDictionary()
+                ),
+            )
+            return return_feat
+
+        return (
+            ee.Join.inner("primary", "secondary").apply(
+                primary,
+                secondary,
+                ee.Filter.equals(leftField=primary_field, rightField=secondary_field),
+            )
+        ).map(_flatten_fields)
+
     # ee asset property values must currently be numbers or strings
     def flatten_inputs(self):
         return_properties = {}
@@ -486,16 +416,14 @@ class EETask(GeoTask):
     #   get_most_recent_image and check_inputs use the latter
     # export_fc_ee - ONLY appends date to asset name (can't set fc meta properties)
     #   get_most_recent_featurecollection uses date appended to name; check_inputs not implemented
-    # export_fc_cloudstorage - no date or other name manipulation. No implementation of `most_recent` or check_inputs.
 
     def export_image_ee(
         self, image, asset_path, image_collection=True, region=None, pyramiding=None
     ):
         image = self.set_export_metadata(image)
         image_name, asset_id = self._prep_asset_id(asset_path, image_collection)
-        if region is None:
-            region = self.extent
-        elif isinstance(region, list):
+        region = region or self.extent
+        if isinstance(region, list):
             region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
         if pyramiding is None:
             pyramiding = {".default": "mean"}
@@ -514,30 +442,6 @@ class EETask(GeoTask):
         self.ee_tasks[image_export.id] = {}
         return image_export.id
 
-    def export_image_cloudstorage(self, image, bucket, asset_path, region=None):
-        image = self.set_export_metadata(image)
-        blob = asset_path.split("/")[-1]
-        if region is None:
-            region = self.extent
-        elif isinstance(region, list):
-            region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
-
-        image_export = ee.batch.Export.image.toCloudStorage(
-            image=image,
-            description=blob,
-            bucket=bucket,
-            fileNamePrefix=asset_path,
-            region=region,
-            fileFormat="GeoTIFF",
-            formatOptions={"cloudOptimized": True},
-            scale=self.scale,
-            crs=self.crs,
-            maxPixels=self.ee_max_pixels,
-        )
-        image_export.start()
-        self.ee_tasks[image_export.id] = {}
-        return image_export.id
-
     def export_fc_ee(self, featurecollection, asset_path):
         featurecollection = self.set_export_metadata(
             featurecollection, ee_type=self.FEATURECOLLECTION
@@ -547,31 +451,6 @@ class EETask(GeoTask):
 
         fc_export = ee.batch.Export.table.toAsset(
             featurecollection, description=fc_name, assetId=asset_id
-        )
-        fc_export.start()
-        self.ee_tasks[fc_export.id] = {}
-        return fc_export.id
-
-    def export_fc_cloudstorage(
-        self,
-        featurecollection,
-        bucket,
-        asset_path,
-        file_format="GeoJSON",
-        selectors=None,
-    ):
-        featurecollection = self.set_export_metadata(
-            featurecollection, ee_type=self.FEATURECOLLECTION
-        )
-        blob = asset_path.split("/")[-1]
-
-        fc_export = ee.batch.Export.table.toCloudStorage(
-            featurecollection,
-            description=blob,
-            bucket=bucket,
-            fileNamePrefix=asset_path,
-            fileFormat=file_format,
-            selectors=selectors,
         )
         fc_export.start()
         self.ee_tasks[fc_export.id] = {}
@@ -620,116 +499,3 @@ class EETask(GeoTask):
             for old_assetid, new_assetid in self.transaction_assets:
                 self._rm_ee(old_assetid)
                 self._mv_ee(new_assetid, old_assetid)
-
-
-class SCLTask(EETask):
-    SPECIES = "species"
-    RESTORATION = "restoration"
-    SURVEY = "survey"
-    FRAGMENT = "fragment"
-    LANDSCAPE_TYPES = [SPECIES, RESTORATION, SURVEY, FRAGMENT]
-    CANONICAL = "canonical"
-
-    ee_project = "SCL/v1"
-    species = None
-    scenario = None
-    ee_aoi = "historical_range"
-
-    def _scl_path(self, scltype):
-        if scltype is None or scltype not in self.LANDSCAPE_TYPES:
-            raise TypeError("Missing or incorrect scltype for setting scl path")
-        return f"{self.ee_rootdir}/pothab/scl_{scltype}"
-
-    def scl_path_species(self):
-        return self._scl_path(self.SPECIES)
-
-    def scl_path_restoration(self):
-        return self._scl_path(self.RESTORATION)
-
-    def scl_path_survey(self):
-        return self._scl_path(self.SURVEY)
-
-    def scl_path_fragment(self):
-        return self._scl_path(self.FRAGMENT)
-
-    def __init__(self, *args, **kwargs):
-        self.species = kwargs.get("species") or os.environ.get("species")
-        if not self.species:
-            # remove this line when we move beyond tigers
-            self.species = "Panthera_tigris"
-            # raise NotImplementedError('`species` must be defined')
-
-        self.scenario = (
-            kwargs.get("scenario") or os.environ.get("scenario") or self.CANONICAL
-        )
-
-        self.speciesdir = f"{PROJECTS}/{self.ee_project}/{self.species}"
-        ee_rootdir = f"{self.speciesdir}/{self.scenario}"
-        path_segments = [s.replace(" ", "_") for s in ee_rootdir.split("/")]
-        ee_rootdir = "/".join(path_segments)
-        super().__init__(*args, ee_rootdir=ee_rootdir, **kwargs)
-        self.set_aoi_from_ee(
-            f"{self.speciesdir}/{self.ee_aoi}"
-        )
-
-
-class HIITask(EETask):
-    scale = 300
-    ee_project = "HII/v1"
-    _popdens_relative = "source/population_density"
-    common_inputs = {
-        "population_density": {
-            "ee_type": EETask.IMAGECOLLECTION,
-            "ee_path": f"projects/HII/v1/{_popdens_relative}",
-            "maxage": 1,
-        },
-        "worldpop": {
-            "ee_type": EETask.IMAGECOLLECTION,
-            "ee_path": "WorldPop/GP/100m/pop",
-            "maxage": 2,
-        },
-    }
-
-    @property
-    def population_density(self):
-        # If population density for previous year has already been calculated and stored, use it
-        popdens = self.common_inputs["population_density"]["ee_path"]
-        population_density, _ = self.get_most_recent_image(ee.ImageCollection(popdens))
-        if population_density:
-            ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
-            system_timestamp = population_density.get(self.ASSET_TIMESTAMP_PROPERTY).getInfo()
-            age = ee_taskdate.difference(system_timestamp, "year").getInfo()
-            if 0 <= age <= self.common_inputs["population_density"]["maxage"]:
-                return population_density
-
-        # Otherwise, calculate and store it before returning it
-        worldpop_ic, worldpop_date = self.get_most_recent_fullyear_imagecollection(
-            ee.ImageCollection(self.common_inputs["worldpop"]["ee_path"]),
-            self.common_inputs["worldpop"]["maxage"],
-        )
-
-        if worldpop_ic:
-            worldpop_scale = worldpop_ic.first().projection().nominalScale()
-            area_km2 = (
-                ee.Image.pixelArea()
-                .multiply(0.000001)
-                .reproject(self.crs, None, worldpop_scale)
-            )
-
-            population_density = (
-                worldpop_ic.mosaic()
-                .divide(area_km2)
-                .setDefaultProjection(self.crs, None, worldpop_scale)
-            )
-            self.export_image_ee(population_density, self._popdens_relative)
-            self.wait()
-            saved_population_density = self.get_most_recent_image(ee.ImageCollection(popdens))
-            return saved_population_density
-
-        return None
-
-    def check_inputs(self):
-        super().check_inputs()
-        if self.population_density is None:
-            self.status = self.FAILED
-            print(f"Could not get population density for {self.taskdate}")
