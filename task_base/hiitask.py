@@ -25,12 +25,13 @@ class HIITask(EETask):
         popdens = self.common_inputs["population_density"]["ee_path"]
         population_density, _ = self.get_most_recent_image(ee.ImageCollection(popdens))
         if population_density:
-            ee_taskdate = ee.Date(self.taskdate.strftime(self.DATE_FORMAT))
-            system_timestamp = population_density.get(
-                self.ASSET_TIMESTAMP_PROPERTY
-            ).getInfo()
-            age = ee_taskdate.difference(system_timestamp, "year").getInfo()
-            if 0 <= age <= self.common_inputs["population_density"]["maxage"]:
+            taskyear = self.taskdate.year
+            popdensyear = _.get("year").getInfo()
+            if (
+                0
+                <= (taskyear - popdensyear)
+                <= self.inputs["population_density"]["maxage"]
+            ):
                 return population_density
 
         # Otherwise, calculate and store it before returning it
@@ -54,7 +55,7 @@ class HIITask(EETask):
             )
             self.export_image_ee(population_density, self._popdens_relative)
             self.wait()
-            saved_population_density = self.get_most_recent_image(
+            saved_population_density, _ = self.get_most_recent_image(
                 ee.ImageCollection(popdens)
             )
             return saved_population_density

@@ -63,11 +63,12 @@ class EETask(GeoTask, DataTransferMixin):
 
         return new_assetid
 
-    def _prep_asset_id(self, asset_path, image_collection=False):
+    def _prep_asset_id(self, asset_path, image_collection=False, pathdate=None):
         asset_path = f"{self.ee_rootdir}/{asset_path}"
         asset_name = asset_path.split("/")[-1]
+        pathdate = pathdate or self.taskdate
         asset_id = self._canonicalize_assetid(
-            f"{asset_path}/{asset_name}_{self.taskdate}"
+            f"{asset_path}/{asset_name}_{pathdate}"
         )
 
         path_segments = asset_path.split("/")
@@ -418,10 +419,10 @@ class EETask(GeoTask, DataTransferMixin):
     #   get_most_recent_featurecollection uses date appended to name; check_inputs not implemented
 
     def export_image_ee(
-        self, image, asset_path, image_collection=True, region=None, pyramiding=None
+        self, image, asset_path, image_collection=True, region=None, pyramiding=None, pathdate=None
     ):
         image = self.set_export_metadata(image)
-        image_name, asset_id = self._prep_asset_id(asset_path, image_collection)
+        image_name, asset_id = self._prep_asset_id(asset_path, image_collection, pathdate)
         region = region or self.extent
         if isinstance(region, list):
             region = ee.Geometry.Polygon(region, proj=self.crs, geodesic=False)
