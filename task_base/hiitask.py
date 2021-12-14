@@ -30,7 +30,7 @@ class HIITask(EETask):
             if (
                 0
                 <= (taskyear - popdensyear)
-                <= self.inputs["population_density"]["maxage"]
+                <= self.common_inputs["population_density"]["maxage"]
             ):
                 return population_density
 
