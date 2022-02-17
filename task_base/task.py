@@ -14,14 +14,17 @@ class Task(object):
     status = NOTSTARTED
     inputs = {}
 
-    def _set_inputs(self):
-        for input_key, i in self.inputs.items():
+    def _set_inputs(self, prop):
+        if not hasattr(self, prop):
+            raise ValueError(f"{self} has no {prop} input properties to set")
+        inputs = getattr(self, prop)
+        for input_key, i in inputs.items():
             for key, val in i.items():
                 if not isinstance(val, str) or not hasattr(self.__class__, val):
                     continue
                 func = getattr(self.__class__, val)
                 if callable(func):
-                    self.inputs[input_key][key] = func(self)
+                    inputs[input_key][key] = func(self)
 
     def __init__(self, *args, **kwargs):
         _taskdate = datetime.now(timezone.utc).date()
@@ -37,7 +40,8 @@ class Task(object):
             kwargs.get("raiseonfail") or os.environ.get("raiseonfail") or True
         )
 
-        self._set_inputs()
+        self._set_inputs("common_inputs")
+        self._set_inputs("inputs")
 
     def check_inputs(self):
         pass

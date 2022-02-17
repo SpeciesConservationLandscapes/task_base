@@ -7,6 +7,11 @@ class HIITask(EETask):
     ee_project = "HII/v1"
     _popdens_relative = "source/population_density"
     common_inputs = {
+        "countries": {
+            "ee_type": EETask.FEATURECOLLECTION,
+            "ee_path": "projects/SCL/v1/source/esri_countries_generalized",
+            "static": True,  # TODO: make dynamic
+        },
         "population_density": {
             "ee_type": EETask.IMAGECOLLECTION,
             "ee_path": f"{PROJECTS}/HII/v1/{_popdens_relative}",
@@ -18,6 +23,12 @@ class HIITask(EETask):
             "maxage": 2,
         },
     }
+
+    def __init__(self, *args, **kwargs):
+        self.countries = ee.FeatureCollection(
+            self.common_inputs["countries"]["ee_path"]
+        ).filter(ee.Filter.neq("ISO", "AQ"))
+        super().__init__(*args, **kwargs)
 
     @property
     def population_density(self):
