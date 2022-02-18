@@ -16,7 +16,7 @@ class Task(object):
 
     def _set_inputs(self, prop):
         if not hasattr(self, prop):
-            raise ValueError(f"{self} has no {prop} input properties to set")
+            return
         inputs = getattr(self, prop)
         for input_key, i in inputs.items():
             for key, val in i.items():
