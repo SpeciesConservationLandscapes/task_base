@@ -30,11 +30,12 @@ class HIITask(EETask):
     }
 
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
         self.countries = ee.FeatureCollection(
             self.common_inputs["countries"]["ee_path"]
         ).filter(ee.Filter.neq("ISO", "AQ"))
         self.watermask = ee.Image(self.common_inputs["watermask"]["ee_path"])
-        super().__init__(*args, **kwargs)
 
     @property
     def population_density(self):
