@@ -9,7 +9,7 @@ class HIITask(EETask):
     common_inputs = {
         "countries": {
             "ee_type": EETask.FEATURECOLLECTION,
-            "ee_path": "projects/SCL/v1/source/esri_countries_generalized",
+            "ee_path": f"{PROJECTS}/SCL/v1/source/esri_countries_generalized",
             "static": True,  # TODO: make dynamic
         },
         "population_density": {
@@ -22,12 +22,18 @@ class HIITask(EETask):
             "ee_path": "WorldPop/GP/100m/pop",
             "maxage": 2,
         },
+        "watermask": {
+            "ee_type": EETask.IMAGE,
+            "ee_path": f"{PROJECTS}/HII/v1/source/phys/watermask_jrc70_cciocean",
+            "static": True,
+        },
     }
 
     def __init__(self, *args, **kwargs):
         self.countries = ee.FeatureCollection(
             self.common_inputs["countries"]["ee_path"]
         ).filter(ee.Filter.neq("ISO", "AQ"))
+        self.watermask = ee.Image(self.common_inputs["watermask"]["ee_path"])
         super().__init__(*args, **kwargs)
 
     @property
