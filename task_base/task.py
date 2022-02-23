@@ -3,6 +3,11 @@ from datetime import datetime, timezone
 
 
 class Task(object):
+    LICENSE = """
+{classname} Copyright (C) 2022 Wildlife Conservation Society
+This program comes with ABSOLUTELY NO WARRANTY. This is free software, and you are welcome to redistribute it under 
+certain conditions; see https://www.gnu.org/licenses/#GPL for details.
+    """
     DATE_FORMAT = "%Y-%m-%d"
     ASSET_TIMESTAMP_PROPERTY = "system:time_start"
 
@@ -27,6 +32,7 @@ class Task(object):
                     inputs[input_key][key] = func(self)
 
     def __init__(self, *args, **kwargs):
+        print(self.LICENSE.format(classname=type(self).__name__))
         _taskdate = datetime.now(timezone.utc).date()
         _taskdatestr = kwargs.get("taskdate") or os.environ.get("taskdate")
         try:
