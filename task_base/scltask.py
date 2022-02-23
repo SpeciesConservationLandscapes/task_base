@@ -94,7 +94,7 @@ class SCLTask(EETask):
         ).filterBounds(self.historical_range_fc.geometry())
         taskyear = ee.Date(self.taskdate.strftime(self.DATE_FORMAT)).get("year")
         self.pas = (
-            ee.FeatureCollection(self.inputs["pas"]["ee_path"])
+            ee.FeatureCollection(self.common_inputs["pas"]["ee_path"])
             .filterBounds(self.historical_range_fc.geometry())
             .filter(ee.Filter.neq("STATUS", "Proposed"))
             .filter(ee.Filter.lte("STATUS_YR", taskyear))
