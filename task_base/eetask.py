@@ -67,9 +67,6 @@ class EETask(GeoTask, DataTransferMixin):
         asset_path = f"{self.ee_rootdir}/{asset_path}"
         asset_name = asset_path.split("/")[-1]
         pathdate = pathdate or self.taskdate
-        asset_id = self._canonicalize_assetid(
-            f"{asset_path}/{asset_name}_{pathdate}"
-        )
 
         path_segments = asset_path.split("/")
         # first two segments are user/project root (e.g. projects/HII)
@@ -83,6 +80,9 @@ class EETask(GeoTask, DataTransferMixin):
             else:
                 ee.data.createAsset({"type": "Folder"}, opt_path=path)
 
+        asset_id = self._canonicalize_assetid(
+            f"{asset_path}/{asset_name}_{pathdate}"
+        )
         return asset_name, asset_id
 
     def _initialize_ee_client(self):
