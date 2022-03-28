@@ -373,6 +373,21 @@ class EETask(GeoTask, DataTransferMixin):
             )
         ).map(_flatten_fields)
 
+    def assign_fc_ids(self, polys, id_label="poly_id"):
+        def _attribute(item):
+            item = ee.List(item)
+            feature = ee.Feature(item.get(0))
+            poly_id = ee.Number(item.get(1)).int()
+
+            feature = feature.set({id_label: poly_id})
+            return feature.select(feature.propertyNames())
+
+        ids = ee.List.sequence(1, polys.size())
+        poly_list = ee.List(polys.toList(polys.size()))
+        return ee.FeatureCollection(
+            poly_list.zip(ids).map(_attribute)
+        )
+
     # ee asset property values must currently be numbers or strings
     def flatten_inputs(self):
         return_properties = {}
