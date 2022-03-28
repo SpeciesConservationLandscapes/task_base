@@ -8,7 +8,11 @@ class SCLTask(EETask):
     RESTORATION = "restoration"
     SURVEY = "survey"
     FRAGMENT = "fragment"
-    LANDSCAPE_TYPES = [SPECIES, RESTORATION, SURVEY, FRAGMENT]
+    LANDSCAPE_TYPES = [SPECIES, RESTORATION, SURVEY] + [
+        f"{SPECIES}_{FRAGMENT}",
+        f"{RESTORATION}_{FRAGMENT}",
+        f"{SURVEY}_{FRAGMENT}",
+    ]
     CANONICAL = "canonical"
 
     ee_project = "SCL/v1"
@@ -43,7 +47,9 @@ class SCLTask(EETask):
         },
     }
 
-    def _scl_path(self, scltype):
+    def _scl_path(self, scltype, fragment=False):
+        if fragment:
+            scltype = f"{scltype}_{self.FRAGMENT}"
         if scltype is None or scltype not in self.LANDSCAPE_TYPES:
             raise TypeError("Missing or incorrect scltype for setting scl path")
         return f"{self.ee_rootdir}/pothab/scl_{scltype}"
@@ -57,8 +63,14 @@ class SCLTask(EETask):
     def scl_path_survey(self):
         return self._scl_path(self.SURVEY)
 
-    def scl_path_fragment(self):
-        return self._scl_path(self.FRAGMENT)
+    def scl_path_species_fragment(self):
+        return self._scl_path(self.SPECIES, True)
+
+    def scl_path_restoration_fragment(self):
+        return self._scl_path(self.RESTORATION, True)
+
+    def scl_path_survey_fragment(self):
+        return self._scl_path(self.SURVEY, True)
 
     def historical_range_path(self):
         return f"{self.speciesdir}/historical_range"
