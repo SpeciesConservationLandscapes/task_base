@@ -263,20 +263,25 @@ class EETask(GeoTask, DataTransferMixin):
     def get_most_recent_featurecollection(self, eedir):
         most_recent_fc = None
         most_recent_date = None
+        most_recent_version = 0
         if not ee.data.getInfo(eedir):
             return None, None
         assets = self._list_assets(eedir)
 
         for asset in assets:
             if asset["type"] == "TABLE":
-                match = re.search(r"\d{4}-\d{2}-\d{2}$", asset["id"])
+                match = re.search(r"(\d{4}-\d{2}-\d{2})(-\d*)*", asset["id"])
                 if match:
-                    fcdate = datetime.strptime(match.group(), self.DATE_FORMAT).date()
+                    fcdate = datetime.strptime(match.group(1), self.DATE_FORMAT).date()
+                    version = None
+                    if match.group(2):
+                        version = int(match.group(2)[1:])
                     if (
-                        not most_recent_fc or fcdate > most_recent_date
+                        not most_recent_fc or fcdate >= most_recent_date
                     ) and fcdate <= self.taskdate:
                         most_recent_fc = ee.FeatureCollection(asset["id"])
                         most_recent_date = fcdate
+                        most_recent_version = version or 0
 
         if most_recent_date is not None:
             most_recent_date = ee.Date(most_recent_date.strftime(self.DATE_FORMAT))
