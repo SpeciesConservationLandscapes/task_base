@@ -29,6 +29,8 @@ earthengine rm "${archivedir_poly}"/scl_survey_"${date}"
 earthengine mv projects/SCL/v1/Panthera_tigris/canonical/pothab/scl_survey/scl_survey_"${date}" "${archivedir_poly}"/scl_survey_"${date}"
 earthengine rm "${archivedir_poly}"/scl_survey_fragment_"${date}"
 earthengine mv projects/SCL/v1/Panthera_tigris/canonical/pothab/scl_survey_fragment/scl_survey_fragment_"${date}" "${archivedir_poly}"/scl_survey_fragment_"${date}"
+earthengine rm "${archivedir_poly}"/scl_scored_"${date}"
+earthengine mv projects/SCL/v1/Panthera_tigris/canonical/pothab/scl_scored/scl_scored_"${date}" "${archivedir_poly}"/scl_scored_"${date}"
 
 earthengine rm "${archivedir_obs_adhoc}"/adhoc_"${date}"
 earthengine mv projects/SCL/v1/Panthera_tigris/canonical/obs/adhoc/adhoc_"${date}" "${archivedir_obs_adhoc}"/adhoc_"${date}"
