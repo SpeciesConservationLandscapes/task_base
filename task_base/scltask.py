@@ -18,7 +18,7 @@ class SCLTask(EETask):
     ee_project = "SCL/v1"
     species = None
     scenario = None
-    ee_aoi = "historical_range"
+    ee_aoi = "indigenous_range"
     common_inputs = {
         "countries": {
             "ee_type": EETask.FEATURECOLLECTION,

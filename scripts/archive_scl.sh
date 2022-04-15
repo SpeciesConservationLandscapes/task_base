@@ -5,6 +5,7 @@
 date=$1
 archivedir_poly=projects/SCL/v1/Panthera_tigris/canonical/pothab_archive
 archivedir_pothab=projects/SCL/v1/Panthera_tigris/canonical/pothab/potential_habitat_archive
+archivedir_strhab=projects/SCL/v1/Panthera_tigris/canonical/structural_habitat_archive
 archivedir_sclimage=projects/SCL/v1/Panthera_tigris/canonical/pothab/scl_image_archive
 archivedir_obs_adhoc=projects/SCL/v1/Panthera_tigris/canonical/obs_archive/adhoc
 archivedir_obs_ct=projects/SCL/v1/Panthera_tigris/canonical/obs_archive/ct
@@ -12,6 +13,8 @@ archivedir_obs_ss=projects/SCL/v1/Panthera_tigris/canonical/obs_archive/ss
 
 earthengine rm "${archivedir_pothab}"/potential_habitat_"${date}"
 earthengine mv projects/SCL/v1/Panthera_tigris/canonical/pothab/potential_habitat/potential_habitat_"${date}" "${archivedir_pothab}"/potential_habitat_"${date}"
+earthengine rm "${archivedir_strhab}"/structural_habitat_"${date}"
+earthengine mv projects/SCL/v1/Panthera_tigris/canonical/structural_habitat/structural_habitat_"${date}" "${archivedir_strhab}"/structural_habitat_"${date}"
 earthengine rm "${archivedir_sclimage}"/scl_image_"${date}"
 earthengine mv projects/SCL/v1/Panthera_tigris/canonical/pothab/scl_image/scl_image_"${date}" "${archivedir_sclimage}"/scl_image_"${date}"
 
