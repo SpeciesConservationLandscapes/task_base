@@ -6,7 +6,7 @@ long_description = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="scl-task_base",
-    version="1.2.0",
+    version="1.2.1",
     packages=["task_base"],
     install_requires=[
         "earthengine-api==0.1.254",

@@ -195,7 +195,7 @@ class EETask(GeoTask, DataTransferMixin):
     def set_aoi_from_ee(self, asset):
         try:  # setting aoi from FeatureCollection
             ee_aoi = ee.Geometry.MultiPolygon(
-                ee.FeatureCollection(asset).first().geometry().coordinates(),
+                ee.FeatureCollection(asset).geometry().coordinates(),
                 proj=self.crs,
                 geodesic=False,
             )
