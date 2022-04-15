@@ -73,7 +73,7 @@ class SCLTask(EETask):
         return self._scl_path(self.SURVEY, True)
 
     def historical_range_path(self):
-        return f"{self.speciesdir}/historical_range"
+        return f"{self.speciesdir}/indigenous_range"
 
     def __init__(self, *args, **kwargs):
         self.species = kwargs.get("species") or os.environ.get("species")
@@ -96,7 +96,7 @@ class SCLTask(EETask):
             self.common_inputs["historical_range"]["ee_path"]
         )
         self.historical_range = self.historical_range_fc.reduceToImage(
-            ["FID"], ee.Reducer.first()
+            ["diss"], ee.Reducer.first()
         ).unmask(0)
         self.countries = ee.FeatureCollection(
             self.common_inputs["countries"]["ee_path"]
