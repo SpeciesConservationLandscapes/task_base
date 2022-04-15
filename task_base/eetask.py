@@ -199,12 +199,9 @@ class EETask(GeoTask, DataTransferMixin):
                 proj=self.crs,
                 geodesic=False,
             )
-            self.aoi = ee_aoi.getInfo()["coordinates"]
-            self.extent = (
-                ee.Geometry.MultiPolygon(self.aoi, proj=self.crs, geodesic=False)
-                .bounds()
-                .getInfo()["coordinates"]
-            )
+            # TODO: refactor so that aoi is actual multipolygon, not bounds().
+            #  Currently without bounds, getInfo()["coordinates"] is too big a payload.
+            self.aoi = self.extent = ee_aoi.bounds().getInfo()["coordinates"]
         except ee.ee_exception.EEException:  # setting aoi from Image
             ee_aoi = ee.Image(asset)
             self.aoi = self.extent = ee_aoi.geometry().bounds().getInfo()["coordinates"]
