@@ -34,7 +34,7 @@ class HIITask(EETask):
 
         self.countries = ee.FeatureCollection(
             self.common_inputs["countries"]["ee_path"]
-        ).filter(ee.Filter.neq("ISO", "AQ"))
+        ).filter(ee.Filter.neq("iso2", "AQ"))
         self.watermask = ee.Image(self.common_inputs["watermask"]["ee_path"])
 
     @property
