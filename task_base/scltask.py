@@ -22,7 +22,7 @@ class SCLTask(EETask):
     common_inputs = {
         "countries": {
             "ee_type": EETask.FEATURECOLLECTION,
-            "ee_path": "projects/SCL/v1/source/esri_countries_generalized",
+            "ee_path": f"{PROJECTS}/SCL/v1/source/gadm404_country_simp",
             "static": True,  # TODO: make dynamic
         },
         "ecoregions": {
@@ -42,7 +42,7 @@ class SCLTask(EETask):
         },
         "watermask": {
             "ee_type": EETask.IMAGE,
-            "ee_path": "projects/HII/v1/source/phys/watermask_jrc70_cciocean",
+            "ee_path": f"{PROJECTS}/HII/v1/source/phys/watermask_jrc70_cciocean",
             "static": True,
         },
     }

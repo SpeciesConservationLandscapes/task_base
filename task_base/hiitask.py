@@ -9,7 +9,7 @@ class HIITask(EETask):
     common_inputs = {
         "countries": {
             "ee_type": EETask.FEATURECOLLECTION,
-            "ee_path": f"{PROJECTS}/SCL/v1/source/esri_countries_generalized",
+            "ee_path": f"{PROJECTS}/SCL/v1/source/gadm404_country_simp",
             "static": True,  # TODO: make dynamic
         },
         "population_density": {
