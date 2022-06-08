@@ -6,12 +6,12 @@ long_description = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="scl-task_base",
-    version="1.2.3",
+    version="1.2.4",
     packages=["task_base"],
     install_requires=[
         "earthengine-api==0.1.254",
         "gitpython==3.1.14",
-        "google-api-python-client==1.12.5",
+        "google-api-python-client==2.50.0",
     ],
     description="Base python classes for creating HII and SCL tasks",
     long_description=long_description,
