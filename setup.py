@@ -10,7 +10,7 @@ setup(
     packages=["task_base"],
     install_requires=[
         "earthengine-api==0.1.254",
-        "gitpython==3.1.14",
+        "gitpython==3.1.34",
         "google-api-python-client==2.50.0",
     ],
     description="Base python classes for creating HII and SCL tasks",
