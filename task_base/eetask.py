@@ -64,21 +64,27 @@ class EETask(GeoTask, DataTransferMixin):
         return new_assetid
 
     def _prep_asset_id(self, asset_path, image_collection=False, pathdate=None):
-        asset_path = f"{self.ee_rootdir}/{asset_path}"
+        """Ensure that all assets along full output path exist in EE (e.g. Folders and ImageCollections)"""
+        asset_path = f"{self.ee_cloud_asset_root}/{asset_path}"
         asset_name = asset_path.split("/")[-1]
         pathdate = pathdate or self.taskdate
 
         path_segments = asset_path.split("/")
-        # first two segments are user/project root (e.g. projects/HII)
+        # first two segments are user/project root (e.g. projects/HII) << legacy
+        # first three segments are projects/project-id/asset root
         path_length = len(path_segments)
-        for i in range(2, path_length):
+        for i in range(3, path_length):
             path = "/".join(path_segments[: i + 1])
             if ee.data.getInfo(path):
+                print(f"{path} exists")
                 continue
             if i == path_length - 1 and image_collection:
                 ee.data.createAsset({"type": "ImageCollection"}, opt_path=path)
+                print(f"Creating ImageCollection: {path}")
             else:
                 ee.data.createAsset({"type": "Folder"}, opt_path=path)
+                print(f"Creating Folder: {path}")
+
 
         asset_id = self._canonicalize_assetid(
             f"{asset_path}/{asset_name}_{pathdate}"
@@ -212,8 +218,18 @@ class EETask(GeoTask, DataTransferMixin):
                 + " `set_aoi_from_ee` asset is neither a FeatureCollection nor an Image path"
             ) from e
 
-    # All inputs MUST have `system:time_start` set
+    
     def get_most_recent_image(self, imagecollection):
+        """
+        Pulls the most recent image from an imagecollection, using self.taskdate as the end-time in the date filter
+        
+        Args:
+            imagecollection: ee.ImageCollection
+            
+        Returns:
+            
+            tuple(ee.Image,ee.Date)
+        """
         # ensure date max filter uses 24-hour period of self.taskdate
         filterdate = self.taskdate + timedelta(days=1)
         filterdate = ee.Date(filterdate.strftime(self.DATE_FORMAT))
@@ -236,6 +252,20 @@ class EETask(GeoTask, DataTransferMixin):
     def get_most_recent_fullyear_imagecollection(
         self, imagecollection, maxage, filterdate=None, iteration=1
     ):
+        """
+        Checks for the most recent year of images in an ee.ImageCollection iteratively up to `iteration` times, 
+        working backward from `self.taskdate` .
+
+        Args:
+            imagecollection: ee.ImageCollection
+            maxage: int
+            filterdate: ee.Date|None
+            iteration: int
+            
+        Returns:
+            tuple(ee.ImageCollection,ee.Date)
+
+        """
         filterdate = filterdate or self.taskdate + timedelta(days=1)
         previousyear_start = date(filterdate.year - 1, 1, 1)
         previousyear_end = date(filterdate.year - 1, 12, 31)
@@ -249,7 +279,8 @@ class EETask(GeoTask, DataTransferMixin):
                 previousyear_start.strftime(self.DATE_FORMAT)
             )
 
-        if iteration < maxage:
+        # checks for most recent imageCollection iteratively 
+        if iteration < maxage: 
             return self.get_most_recent_fullyear_imagecollection(
                 imagecollection, maxage, previousyear_start, iteration + 1
             )
